@@ -25,6 +25,14 @@ export async function createProject(input: {
 
   const name = input.name?.trim();
   if (!name) return { error: "Project name is required." };
+  if (input.budget == null || Number.isNaN(input.budget)) return { error: "Budget is required." };
+  if (!input.currency) return { error: "Currency is required." };
+  if (!input.startDate) return { error: "Expected start is required." };
+  if (!input.endDate) return { error: "Expected end is required." };
+  for (const r of input.members || []) {
+    if (r.rate == null || Number.isNaN(r.rate)) return { error: "An hourly rate is required for every added member." };
+    if (!r.timezone) return { error: "A timezone is required for every added member." };
+  }
 
   const id = crypto.randomUUID();
   await db.insert(project).values({
@@ -32,10 +40,10 @@ export async function createProject(input: {
     organizationId: m.orgId,
     name,
     description: input.description?.trim() || null,
-    budget: input.budget ?? null,
-    currency: input.currency || "USD",
-    startDate: input.startDate || null,
-    endDate: input.endDate || null,
+    budget: input.budget,
+    currency: input.currency,
+    startDate: input.startDate,
+    endDate: input.endDate,
     createdBy: m.userId,
   });
 
@@ -44,6 +52,7 @@ export async function createProject(input: {
   for (const r of input.members || []) {
     if (valid.has(r.userId)) byId.set(r.userId, { rate: r.rate ?? null, timezone: r.timezone ?? null });
   }
+  // The creator is always on the project; their rate/timezone can be set afterward.
   if (!byId.has(m.userId)) byId.set(m.userId, { rate: null, timezone: null });
   for (const [userId, v] of byId) {
     await db
@@ -68,16 +77,18 @@ async function canManageProject(projectId: string) {
 export async function addProjectMember(
   projectId: string,
   userId: string,
-  rate?: number | null,
-  timezone?: string | null,
+  rate: number | null,
+  timezone: string | null,
 ) {
   const m = await canManageProject(projectId);
   if (!m?.orgId) return { error: "Not allowed." };
+  if (rate == null || Number.isNaN(rate)) return { error: "An hourly rate is required." };
+  if (!timezone) return { error: "A timezone is required." };
   const valid = await orgMemberIds(m.orgId);
   if (!valid.has(userId)) return { error: "That person isn't in this workspace." };
   await db
     .insert(projectMember)
-    .values({ id: crypto.randomUUID(), projectId, userId, rate: rate ?? null, timezone: timezone ?? null })
+    .values({ id: crypto.randomUUID(), projectId, userId, rate, timezone })
     .onConflictDoNothing();
   return { ok: true };
 }
@@ -99,6 +110,8 @@ export async function updateProjectMember(
 ) {
   const m = await canManageProject(projectId);
   if (!m) return { error: "Not allowed." };
+  if (rate == null || Number.isNaN(rate)) return { error: "An hourly rate is required." };
+  if (!timezone) return { error: "A timezone is required." };
   await db
     .update(projectMember)
     .set({ rate, timezone })

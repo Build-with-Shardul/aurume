@@ -77,15 +77,15 @@ export default function ProjectMembersClient({
               <div className="flex flex-wrap items-center gap-2">
                 <span className="min-w-40 font-medium">{p.name || p.email}</span>
                 <span className="text-xs text-neutral-400">{currency}/hr</span>
-                <input type="number" min="0" value={editRate} onChange={(e) => setEditRate(e.target.value)} placeholder="Rate" className={`${field} w-24`} />
-                <select value={editTz} onChange={(e) => setEditTz(e.target.value)} className={`${field} w-56`}>
+                <input required type="number" min="0" value={editRate} onChange={(e) => setEditRate(e.target.value)} placeholder="Rate *" className={`${field} w-24`} />
+                <select required value={editTz} onChange={(e) => setEditTz(e.target.value)} className={`${field} w-56`}>
                   {timezones.map((z) => (
                     <option key={z} value={z}>{z}</option>
                   ))}
                 </select>
                 <button
-                  disabled={busy === p.userId}
-                  onClick={() => act(p.userId, () => updateProjectMember(projectId, p.userId, editRate.trim() ? Math.round(Number(editRate)) : null, editTz || null)).then(() => setEditId(""))}
+                  disabled={busy === p.userId || !editRate.trim() || !editTz}
+                  onClick={() => act(p.userId, () => updateProjectMember(projectId, p.userId, Math.round(Number(editRate)), editTz)).then(() => setEditId(""))}
                   className="rounded-md bg-neutral-900 px-3 py-1 text-xs font-medium text-white hover:bg-neutral-800"
                 >
                   Save
@@ -136,15 +136,15 @@ export default function ProjectMembersClient({
             ))}
           </select>
           <span className="text-xs text-neutral-400">{currency}/hr</span>
-          <input type="number" min="0" value={addRate} onChange={(e) => setAddRate(e.target.value)} placeholder="Rate" className={`${field} w-24`} />
-          <select value={addTz} onChange={(e) => setAddTz(e.target.value)} className={`${field} w-52`}>
+          <input required type="number" min="0" value={addRate} onChange={(e) => setAddRate(e.target.value)} placeholder="Rate *" className={`${field} w-24`} />
+          <select required value={addTz} onChange={(e) => setAddTz(e.target.value)} className={`${field} w-52`}>
             {timezones.map((z) => (
               <option key={z} value={z}>{z}</option>
             ))}
           </select>
           <button
-            onClick={() => { if (toAdd) act("add", () => addProjectMember(projectId, toAdd, addRate.trim() ? Math.round(Number(addRate)) : null, addTz || null)).then(() => { setToAdd(""); setAddRate(""); }); }}
-            disabled={!toAdd || busy === "add"}
+            onClick={() => { if (toAdd && addRate.trim() && addTz) act("add", () => addProjectMember(projectId, toAdd, Math.round(Number(addRate)), addTz)).then(() => { setToAdd(""); setAddRate(""); }); }}
+            disabled={!toAdd || !addRate.trim() || !addTz || busy === "add"}
             className="rounded-lg bg-neutral-900 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-800 disabled:opacity-50"
           >
             {busy === "add" ? "Adding…" : "Add"}

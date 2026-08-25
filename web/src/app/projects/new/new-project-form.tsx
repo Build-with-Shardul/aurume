@@ -62,30 +62,33 @@ export default function NewProjectForm({
     e.preventDefault();
     setErr("");
 
-    let startISO: string | null = null;
-    let endISO: string | null = null;
-    if (startDate.trim()) {
-      startISO = mmddyyyyToISO(startDate);
-      if (!startISO) return setErr("Expected start must be MM/DD/YYYY.");
-    }
-    if (endDate.trim()) {
-      endISO = mmddyyyyToISO(endDate);
-      if (!endISO) return setErr("Expected end must be MM/DD/YYYY.");
-    }
+    if (!budget.trim()) return setErr("Budget is required.");
+    if (!currency) return setErr("Currency is required.");
+    if (!startDate.trim()) return setErr("Expected start is required.");
+    if (!endDate.trim()) return setErr("Expected end is required.");
 
-    const members = others
-      .filter((o) => rows[o.userId]?.include)
-      .map((o) => ({
-        userId: o.userId,
-        rate: rows[o.userId].rate.trim() ? Math.round(Number(rows[o.userId].rate)) : null,
-        timezone: rows[o.userId].timezone || null,
-      }));
+    const startISO = mmddyyyyToISO(startDate);
+    if (!startISO) return setErr("Expected start must be MM/DD/YYYY.");
+    const endISO = mmddyyyyToISO(endDate);
+    if (!endISO) return setErr("Expected end must be MM/DD/YYYY.");
+
+    const chosen = others.filter((o) => rows[o.userId]?.include);
+    for (const o of chosen) {
+      const row = rows[o.userId];
+      if (!row.rate.trim()) return setErr(`Set an hourly rate for ${o.name || o.email}.`);
+      if (!row.timezone) return setErr(`Set a timezone for ${o.name || o.email}.`);
+    }
+    const members = chosen.map((o) => ({
+      userId: o.userId,
+      rate: Math.round(Number(rows[o.userId].rate)),
+      timezone: rows[o.userId].timezone,
+    }));
 
     setBusy(true);
     const r = await createProject({
       name,
       description,
-      budget: budget.trim() ? Math.round(Number(budget)) : null,
+      budget: Math.round(Number(budget)),
       currency,
       startDate: startISO,
       endDate: endISO,
@@ -112,12 +115,12 @@ export default function NewProjectForm({
 
       <div className="mb-4 grid grid-cols-3 gap-3">
         <div className="col-span-2">
-          <label className={label}>Budget</label>
-          <input type="number" min="0" value={budget} onChange={(e) => setBudget(e.target.value)} placeholder="0" className={field} />
+          <label className={label}>Budget *</label>
+          <input required type="number" min="0" value={budget} onChange={(e) => setBudget(e.target.value)} placeholder="0" className={field} />
         </div>
         <div>
-          <label className={label}>Currency</label>
-          <select value={currency} onChange={(e) => setCurrency(e.target.value)} className={field}>
+          <label className={label}>Currency *</label>
+          <select required value={currency} onChange={(e) => setCurrency(e.target.value)} className={field}>
             {currencies.map((c) => (
               <option key={c} value={c}>{c}</option>
             ))}
@@ -127,18 +130,18 @@ export default function NewProjectForm({
 
       <div className="mb-6 grid grid-cols-2 gap-3">
         <div>
-          <label className={label}>Expected start</label>
-          <input value={startDate} onChange={(e) => setStartDate(e.target.value)} placeholder="MM/DD/YYYY" inputMode="numeric" className={field} />
+          <label className={label}>Expected start *</label>
+          <input required value={startDate} onChange={(e) => setStartDate(e.target.value)} placeholder="MM/DD/YYYY" inputMode="numeric" className={field} />
         </div>
         <div>
-          <label className={label}>Expected end</label>
-          <input value={endDate} onChange={(e) => setEndDate(e.target.value)} placeholder="MM/DD/YYYY" inputMode="numeric" className={field} />
+          <label className={label}>Expected end *</label>
+          <input required value={endDate} onChange={(e) => setEndDate(e.target.value)} placeholder="MM/DD/YYYY" inputMode="numeric" className={field} />
         </div>
       </div>
 
       <label className={label}>Members</label>
       <p className="-mt-1 mb-2 text-xs text-neutral-400">
-        You&apos;re added automatically. Check who else works on this project and set their hourly rate ({currency}) and timezone. You can change all of this later.
+        You&apos;re added automatically. Check who else works on this project — an hourly rate ({currency}) and timezone are required for each. You can change all of this later.
       </p>
       <div className="mb-6 overflow-hidden rounded-lg border border-neutral-200">
         {others.length === 0 ? (
@@ -159,7 +162,7 @@ export default function NewProjectForm({
                   <div className="mt-2 grid grid-cols-2 gap-2 pl-7">
                     <div className="flex items-center gap-2">
                       <span className="text-xs text-neutral-400">{currency}/hr</span>
-                      <input type="number" min="0" value={row.rate} onChange={(e) => setRow(o.userId, { rate: e.target.value })} placeholder="Rate" className="w-full rounded-md border border-neutral-300 px-2 py-1 text-sm outline-none focus:border-neutral-900" />
+                      <input required type="number" min="0" value={row.rate} onChange={(e) => setRow(o.userId, { rate: e.target.value })} placeholder="Rate *" className="w-full rounded-md border border-neutral-300 px-2 py-1 text-sm outline-none focus:border-neutral-900" />
                     </div>
                     <select value={row.timezone} onChange={(e) => setRow(o.userId, { timezone: e.target.value })} className="w-full rounded-md border border-neutral-300 px-2 py-1 text-sm outline-none focus:border-neutral-900">
                       {timezones.map((z) => (
