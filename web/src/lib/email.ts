@@ -1,25 +1,21 @@
 import { Resend } from "resend";
-
-const from = process.env.EMAIL_FROM || "Aurume <noreply@aurume.dev>";
-const apiKey = process.env.RESEND_API_KEY;
-const resend = apiKey ? new Resend(apiKey) : null;
+import { getConnector } from "./connectors";
 
 function baseUrl() {
   return process.env.BETTER_AUTH_URL || "http://localhost:3000";
 }
 
 /**
- * Called by the organization plugin when someone is invited. `data.id` is the invitation id;
- * the invitee accepts (and sets a password if new) at /accept-invitation/[id].
- *
- * If RESEND_API_KEY isn't set (common in early dev), we log the accept link to the server
- * console instead of failing, so the invite flow is still testable.
+ * Sends the invitation email. Resolution order for the sender:
+ *   1. the org's connected Resend connector (Settings → Connectors)
+ *   2. env RESEND_API_KEY / EMAIL_FROM
+ *   3. neither → log the accept link to the server console (dev)
  */
 export async function sendInvitationEmail(data: {
   id: string;
   email: string;
   role?: string;
-  organization?: { name?: string };
+  organization?: { id?: string; name?: string };
   inviter?: { user?: { name?: string; email?: string } };
 }) {
   const acceptUrl = `${baseUrl()}/accept-invitation/${data.id}`;
@@ -27,13 +23,29 @@ export async function sendInvitationEmail(data: {
   const inviter = data.inviter?.user?.name || data.inviter?.user?.email || "your team";
   const subject = `You've been invited to ${orgName}`;
 
-  if (!resend) {
+  let apiKey: string | null = process.env.RESEND_API_KEY || null;
+  let from = process.env.EMAIL_FROM || "Aurume <noreply@aurume.dev>";
+
+  if (data.organization?.id) {
+    try {
+      const c = await getConnector(data.organization.id, "resend");
+      if (c?.secret) {
+        apiKey = c.secret;
+        if (c.config.fromEmail) from = c.config.fromEmail;
+      }
+    } catch {
+      /* fall back below */
+    }
+  }
+
+  if (!apiKey) {
     console.log(
-      `\n[invite] ${data.email} as "${data.role ?? "member"}" → ${acceptUrl}\n(RESEND_API_KEY not set — link logged for dev.)\n`,
+      `\n[invite] ${data.email} as "${data.role ?? "member"}" → ${acceptUrl}\n(No Resend connected — link logged for dev.)\n`,
     );
     return;
   }
 
+  const resend = new Resend(apiKey);
   const html = `<!doctype html><html><body style="font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:#f6f5f9;padding:24px;color:#17141d">
   <div style="max-width:520px;margin:0 auto;background:#fff;border:1px solid #e7e3ee;border-radius:12px;padding:30px">
     <h2 style="margin:0 0 8px">You're invited to ${orgName}</h2>

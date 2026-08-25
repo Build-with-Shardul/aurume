@@ -4,6 +4,7 @@ import {
   text,
   timestamp,
   boolean,
+  jsonb,
   index,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
@@ -190,3 +191,36 @@ export const invitationRelations = relations(invitation, ({ one }) => ({
     references: [user.id],
   }),
 }));
+
+// --- Aurume: 3rd-party connectors (Resend, and more later). Secret is encrypted at rest. ---
+export const connector = pgTable(
+  "connector",
+  {
+    id: text("id").primaryKey(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    provider: text("provider").notNull(), // e.g. "resend"
+    config: jsonb("config"), // non-secret settings (e.g. { fromEmail })
+    secret: text("secret"), // encrypted (AES-256-GCM) — never returned to the client
+    status: text("status").default("connected").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (t) => [uniqueIndex("connector_org_provider_uidx").on(t.organizationId, t.provider)],
+);
+
+// --- Aurume: custom disciplines (job titles) an admin adds on top of the built-in list. ---
+export const discipline = pgTable(
+  "discipline",
+  {
+    id: text("id").primaryKey(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    value: text("value").notNull(), // slug stored on member/invitation
+    label: text("label").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => [uniqueIndex("discipline_org_value_uidx").on(t.organizationId, t.value)],
+);

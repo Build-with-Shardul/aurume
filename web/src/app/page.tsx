@@ -48,12 +48,20 @@ export default async function Home() {
               </span>
             </div>
             {canManage && (
-              <Link
-                href="/admin/people"
-                className="mt-5 inline-block rounded-lg bg-neutral-900 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-800"
-              >
-                Manage people →
-              </Link>
+              <div className="mt-5 flex flex-wrap gap-3">
+                <Link
+                  href="/admin/people"
+                  className="inline-block rounded-lg bg-neutral-900 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-800"
+                >
+                  Manage people →
+                </Link>
+                <Link
+                  href="/settings/connectors"
+                  className="inline-block rounded-lg border border-neutral-300 px-4 py-2 text-sm font-medium text-neutral-800 hover:bg-neutral-50"
+                >
+                  Connectors
+                </Link>
+              </div>
             )}
           </div>
         ) : (
