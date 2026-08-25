@@ -43,6 +43,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
                 {started ? "Started" : "Not started"}
               </span>
             </div>
+            <p className="mt-1 text-xs text-neutral-400">Project ID: <span className="font-mono">{p.id}</span></p>
             {p.description && <p className="mt-2 text-neutral-600">{p.description}</p>}
           </div>
           <Link
@@ -60,7 +61,6 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
           <Field label="Expected start" value={isoToMmddyyyy(p.startDate) || "—"} />
           <Field label="Expected end" value={isoToMmddyyyy(p.endDate) || "—"} />
         </div>
-        <p className="mt-4 text-xs text-neutral-400">Project ID: <span className="font-mono">{p.id}</span></p>
 
         <Link
           href={`/projects/${id}/knowledge`}
@@ -77,11 +77,6 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
             <div className="text-xs text-neutral-400">item{knowledgeCount === 1 ? "" : "s"}</div>
           </div>
         </Link>
-
-        <p className="mt-6 text-sm text-neutral-500">
-          Members, budget and timeline are managed in{" "}
-          <Link href={`/projects/${id}/settings`} className="font-medium text-neutral-900 underline">project settings</Link>.
-        </p>
       </div>
     </main>
   );
