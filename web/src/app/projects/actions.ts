@@ -4,6 +4,7 @@ import { and, eq } from "drizzle-orm";
 import { getActiveMembership, canCreateProject, canManageOrg } from "@/lib/auth-server";
 import { db } from "@/lib/db";
 import { project, projectMember, member } from "@/lib/db/schema";
+import { isProjectStarted } from "@/lib/dates";
 
 async function orgMemberIds(orgId: string): Promise<Set<string>> {
   const rows = await db.select({ userId: member.userId }).from(member).where(eq(member.organizationId, orgId));
@@ -62,6 +63,31 @@ export async function createProject(input: {
   }
 
   return { ok: true, id };
+}
+
+export async function updateProjectSettings(
+  projectId: string,
+  input: { budget: number | null; startDate: string | null; endDate: string | null },
+) {
+  const m = await canManageProject(projectId);
+  if (!m) return { error: "Not allowed." };
+  const p = (await db.select().from(project).where(eq(project.id, projectId)).limit(1))[0];
+  if (!p) return { error: "Project not found." };
+
+  if (input.budget == null || Number.isNaN(input.budget)) return { error: "Budget is required." };
+  if (!input.endDate) return { error: "Expected end is required." };
+
+  const started = isProjectStarted(p.startDate);
+  // Once a project has started its start date is locked; otherwise it stays editable.
+  const startDate = started ? p.startDate : input.startDate;
+  if (!startDate) return { error: "Expected start is required." };
+  if (input.endDate < startDate) return { error: "Expected end can't be before the start date." };
+
+  await db
+    .update(project)
+    .set({ budget: input.budget, startDate, endDate: input.endDate, updatedAt: new Date() })
+    .where(eq(project.id, projectId));
+  return { ok: true };
 }
 
 /** Add/remove members allowed for the project creator or an org owner/admin. */

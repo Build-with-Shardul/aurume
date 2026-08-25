@@ -3,10 +3,9 @@ import Link from "next/link";
 import { eq } from "drizzle-orm";
 import { getActiveMembership, canManageOrg } from "@/lib/auth-server";
 import { db } from "@/lib/db";
-import { project, projectMember, member, user } from "@/lib/db/schema";
+import { project, projectMember } from "@/lib/db/schema";
 import { formatBudget } from "@/lib/currencies";
-import { isoToMmddyyyy } from "@/lib/dates";
-import ProjectMembersClient from "./project-members-client";
+import { isoToMmddyyyy, isProjectStarted } from "@/lib/dates";
 
 export default async function ProjectPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -16,27 +15,12 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
   const p = (await db.select().from(project).where(eq(project.id, id)).limit(1))[0];
   if (!p || p.organizationId !== m.orgId) notFound();
 
-  const members = await db
-    .select({
-      userId: projectMember.userId,
-      name: user.name,
-      email: user.email,
-      rate: projectMember.rate,
-      timezone: projectMember.timezone,
-    })
-    .from(projectMember)
-    .innerJoin(user, eq(user.id, projectMember.userId))
-    .where(eq(projectMember.projectId, id));
+  const memberCount = (
+    await db.select({ userId: projectMember.userId }).from(projectMember).where(eq(projectMember.projectId, id))
+  ).length;
 
-  const orgMembers = await db
-    .select({ userId: member.userId, name: user.name, email: user.email })
-    .from(member)
-    .innerJoin(user, eq(user.id, member.userId))
-    .where(eq(member.organizationId, m.orgId));
-
-  const onProject = new Set(members.map((x) => x.userId));
-  const addable = orgMembers.filter((o) => !onProject.has(o.userId));
   const canManage = canManageOrg(m.role) || p.createdBy === m.userId;
+  const started = isProjectStarted(p.startDate);
 
   return (
     <main className="min-h-screen bg-neutral-50 text-neutral-900">
@@ -48,20 +32,37 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
       </header>
       <div className="mx-auto max-w-3xl px-6 py-10">
         <Link href="/projects" className="text-sm text-neutral-500 hover:text-neutral-900">← Projects</Link>
-        <h1 className="mt-3 text-2xl font-semibold">{p.name}</h1>
-        {p.description && <p className="mt-2 text-neutral-600">{p.description}</p>}
+        <div className="mt-3 flex items-start justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-2">
+              <h1 className="text-2xl font-semibold">{p.name}</h1>
+              <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${started ? "bg-green-100 text-green-700" : "bg-neutral-100 text-neutral-500"}`}>
+                {started ? "Started" : "Not started"}
+              </span>
+            </div>
+            {p.description && <p className="mt-2 text-neutral-600">{p.description}</p>}
+          </div>
+          <Link
+            href={`/projects/${id}/settings`}
+            className="shrink-0 rounded-lg border border-neutral-300 px-3 py-2 text-sm font-medium hover:bg-white"
+            aria-label="Project settings"
+          >
+            ⚙ Settings
+          </Link>
+        </div>
 
         <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
           <Field label="Budget" value={formatBudget(p.budget, p.currency)} />
-          <Field label="Currency" value={p.currency} />
+          <Field label="Members" value={String(memberCount)} />
           <Field label="Expected start" value={isoToMmddyyyy(p.startDate) || "—"} />
           <Field label="Expected end" value={isoToMmddyyyy(p.endDate) || "—"} />
         </div>
         <p className="mt-4 text-xs text-neutral-400">Project ID: <span className="font-mono">{p.id}</span></p>
 
-        <div className="mt-8">
-          <ProjectMembersClient projectId={id} members={members} addable={addable} canManage={canManage} currency={p.currency} />
-        </div>
+        <p className="mt-6 text-sm text-neutral-500">
+          Members, budget and timeline are managed in{" "}
+          <Link href={`/projects/${id}/settings`} className="font-medium text-neutral-900 underline">project settings</Link>.
+        </p>
       </div>
     </main>
   );

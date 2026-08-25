@@ -21,3 +21,13 @@ export function isoToMmddyyyy(s: string | null | undefined): string {
   if (!m) return String(s);
   return `${m[2]}/${m[3]}/${m[1]}`;
 }
+
+export function todayISO(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+/** A project is "started" once its expected start date is today or in the past. */
+export function isProjectStarted(startDate: string | null | undefined): boolean {
+  if (!startDate) return false;
+  return String(startDate).slice(0, 10) <= todayISO();
+}
