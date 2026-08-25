@@ -36,3 +36,16 @@ export async function getActiveMembership() {
 export function canManageOrg(role: string | null) {
   return role === "owner" || role === "admin";
 }
+
+/** The current user's INSTANCE role (user.role: "admin" = platform Super Admin). */
+export async function getInstanceRole() {
+  const session = await getSession();
+  if (!session) return null;
+  const rows = await db.select({ role: user.role }).from(user).where(eq(user.id, session.user.id)).limit(1);
+  return { session, role: (rows[0]?.role ?? "user") as string };
+}
+
+export async function isInstanceAdmin() {
+  const r = await getInstanceRole();
+  return r?.role === "admin";
+}

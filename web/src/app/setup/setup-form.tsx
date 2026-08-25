@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { authClient, signUp } from "@/lib/auth-client";
+import { bootstrapInstanceAdmin } from "./actions";
 
 function slugify(s: string) {
   return (
@@ -37,6 +38,9 @@ export default function SetupForm() {
     }
     const orgId = co.data?.id;
     if (orgId) await authClient.organization.setActive({ organizationId: orgId });
+
+    // Founder becomes the instance Super Admin (self-closes once one exists).
+    await bootstrapInstanceAdmin();
 
     router.push("/admin/people");
     router.refresh();
