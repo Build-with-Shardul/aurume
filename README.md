@@ -64,7 +64,8 @@ them. Only shipped repos are listed as such — this table is the honest status.
 | `llm-observability` | Traces, cost, latency, quality over real runs | Planned |
 
 The full plan — scope, locked decisions, and open design questions — lives in
-[docs/PROJECT_PLAN.md](./docs/PROJECT_PLAN.md).
+[docs/PROJECT_PLAN.md](./docs/PROJECT_PLAN.md). For an honest inventory of what
+isn't built yet (and the suggested build order), see [docs/GAPS.md](./docs/GAPS.md).
 
 ## License & contributing
 
