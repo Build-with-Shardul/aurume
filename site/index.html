@@ -39,6 +39,8 @@
   .btn-primary:hover{background:#f0f0ec}
   .btn-ghost{border:1px solid var(--line-strong);color:rgba(255,255,255,.9)}
   .btn-ghost:hover{background:rgba(255,255,255,.06);border-color:var(--line-strong)}
+  /* On phones, drop the in-page anchors and keep a clean brand + GitHub nav */
+  @media(max-width:600px){ .nav-links{gap:14px} .nav-links a:not(.btn){display:none} }
 
   /* hero */
   .hero{padding:96px 0 72px;text-align:center;background:radial-gradient(ellipse 70% 55% at 50% -10%,rgba(255,255,255,.05),transparent 70%)}
@@ -60,6 +62,14 @@
   .card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:22px}
   .card h3{font-size:17px;margin:0 0 6px}
   .card p{margin:0;font-size:14.5px;color:var(--body)}
+
+  /* tech stack */
+  .stack{display:flex;flex-direction:column;gap:20px}
+  .stack-group{display:flex;gap:18px;align-items:baseline;flex-wrap:wrap}
+  .stack-label{flex:none;min-width:170px;color:var(--muted);font-size:12.5px;font-weight:600;text-transform:uppercase;letter-spacing:.1em}
+  .pills{display:flex;gap:8px;flex-wrap:wrap}
+  .pill{border:1px solid var(--line-strong);border-radius:999px;padding:6px 14px;font-size:14px;color:var(--ink);background:rgba(255,255,255,.03)}
+  @media(max-width:640px){.stack-label{min-width:100%}}
 
   /* roadmap */
   .road{display:flex;flex-direction:column;gap:2px}
@@ -87,6 +97,7 @@
     <a class="brand" href="/">Aurume</a>
     <div class="nav-links">
       <a href="#how">How</a>
+      <a href="#stack">Stack</a>
       <a href="#roadmap">Roadmap</a>
       <a class="btn btn-ghost" href="https://github.com/Build-with-Shardul/aurume" target="_blank" rel="noopener">GitHub ↗</a>
     </div>
@@ -122,6 +133,21 @@
       <div class="card"><h3>Benchmarked, not demoed</h3><p>Every AI step ships with groundedness scores, cost per generation, and documented failures — the numbers that show the thinking.</p></div>
       <div class="card"><h3>Bring your own key</h3><p>OpenAI, Anthropic, or fully local via Ollama. Self-hostable in one command, so no data need leave your environment.</p></div>
       <div class="card"><h3>Deterministic where it counts</h3><p>Scheduling and cost math are arithmetic, not LLM guesses. The model is used only where judgement genuinely helps.</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="block" id="stack">
+  <div class="wrap">
+    <span class="eyebrow">Tech stack</span>
+    <h2>Chosen deliberately, documented as decisions.</h2>
+    <p class="sub">Every choice has a written decision record in the repo explaining the why. The short version:</p>
+    <div class="stack">
+      <div class="stack-group"><span class="stack-label">AI services</span><div class="pills"><span class="pill">Python</span><span class="pill">FastAPI</span><span class="pill">LangGraph</span></div></div>
+      <div class="stack-group"><span class="stack-label">Models · BYO key</span><div class="pills"><span class="pill">Anthropic</span><span class="pill">OpenAI</span><span class="pill">Ollama</span></div></div>
+      <div class="stack-group"><span class="stack-label">Data</span><div class="pills"><span class="pill">PostgreSQL</span><span class="pill">pgvector</span></div></div>
+      <div class="stack-group"><span class="stack-label">Product &amp; QA</span><div class="pills"><span class="pill">TypeScript</span><span class="pill">Playwright</span></div></div>
+      <div class="stack-group"><span class="stack-label">Run anywhere</span><div class="pills"><span class="pill">Docker</span><span class="pill">GitHub Actions</span><span class="pill">AGPLv3</span></div></div>
     </div>
   </div>
 </section>
