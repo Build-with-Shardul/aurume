@@ -1,0 +1,40 @@
+name: Bug report
+description: Something isn't working as expected
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: Thanks for taking the time to file a bug. The more precise the repro, the faster it's fixed.
+  - type: input
+    id: component
+    attributes:
+      label: Component / repo
+      description: Which part of Aurume? (e.g. playbook-drafter, the aurume.dev site, the docs)
+      placeholder: playbook-drafter
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What did you see, and what did you expect instead?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. ...
+        2. ...
+        3. ...
+    validations:
+      required: true
+  - type: textarea
+    id: env
+    attributes:
+      label: Environment
+      description: OS, Python/Node version, model provider, and the Aurume version or commit SHA.
+    validations:
+      required: false
