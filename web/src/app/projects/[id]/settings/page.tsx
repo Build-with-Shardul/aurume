@@ -3,10 +3,11 @@ import Link from "next/link";
 import { eq } from "drizzle-orm";
 import { getActiveMembership, canManageOrg } from "@/lib/auth-server";
 import { db } from "@/lib/db";
-import { project, projectMember, member, user } from "@/lib/db/schema";
+import { project, projectMember, member, user, connector } from "@/lib/db/schema";
 import { isProjectStarted } from "@/lib/dates";
 import ProjectMembersClient from "../project-members-client";
 import ProjectSettingsForm from "./project-settings-form";
+import ProjectChannelsForm from "./project-channels-form";
 
 export default async function ProjectSettingsPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -37,7 +38,14 @@ export default async function ProjectSettingsPage({ params }: { params: Promise<
   const onProject = new Set(members.map((x) => x.userId));
   const addable = orgMembers.filter((o) => !onProject.has(o.userId));
   const canManage = canManageOrg(m.role) || p.createdBy === m.userId;
+  const isOrgManager = canManageOrg(m.role);
   const started = isProjectStarted(p.startDate);
+
+  const connectors = await db
+    .select({ provider: connector.provider })
+    .from(connector)
+    .where(eq(connector.organizationId, m.orgId));
+  const connectedProviders = new Set(connectors.map((c) => c.provider));
 
   return (
     <main className="min-h-screen bg-neutral-50 text-neutral-900">
@@ -61,6 +69,15 @@ export default async function ProjectSettingsPage({ params }: { params: Promise<
             endDate={p.endDate}
             started={started}
             canManage={canManage}
+          />
+          <ProjectChannelsForm
+            projectId={id}
+            slackChannel={p.slackChannel}
+            teamsChannel={p.teamsChannel}
+            slackConnected={connectedProviders.has("slack")}
+            teamsConnected={connectedProviders.has("teams")}
+            canManage={canManage}
+            canManageOrg={isOrgManager}
           />
           <ProjectMembersClient projectId={id} members={members} addable={addable} canManage={canManage} currency={p.currency} />
         </div>

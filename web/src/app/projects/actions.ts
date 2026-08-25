@@ -90,6 +90,23 @@ export async function updateProjectSettings(
   return { ok: true };
 }
 
+export async function updateProjectChannels(
+  projectId: string,
+  input: { slackChannel: string | null; teamsChannel: string | null },
+) {
+  const m = await canManageProject(projectId);
+  if (!m) return { error: "Not allowed." };
+  await db
+    .update(project)
+    .set({
+      slackChannel: input.slackChannel?.trim() || null,
+      teamsChannel: input.teamsChannel?.trim() || null,
+      updatedAt: new Date(),
+    })
+    .where(eq(project.id, projectId));
+  return { ok: true };
+}
+
 /** Add/remove members allowed for the project creator or an org owner/admin. */
 async function canManageProject(projectId: string) {
   const m = await getActiveMembership();

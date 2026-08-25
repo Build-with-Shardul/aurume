@@ -241,6 +241,8 @@ export const project = pgTable(
     currency: text("currency").default("USD").notNull(),
     startDate: date("start_date"),
     endDate: date("end_date"),
+    slackChannel: text("slack_channel"), // project-specific channel id/name, uses the org Slack connector
+    teamsChannel: text("teams_channel"), // project-specific channel id/name, uses the org Teams connector
     createdBy: text("created_by").references(() => user.id, { onDelete: "set null" }),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),

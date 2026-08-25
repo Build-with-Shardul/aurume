@@ -32,9 +32,28 @@ export const CONNECTOR_PROVIDERS: ConnectorProvider[] = [
       { key: "fromEmail", label: "From address", type: "text", secret: false, placeholder: "Aurume <noreply@yourdomain.com>" },
     ],
   },
+  {
+    id: "slack",
+    name: "Slack",
+    description: "Connect your Slack workspace once; projects then point at their own channels.",
+    available: true,
+    fields: [
+      { key: "botToken", label: "Bot user OAuth token", type: "password", secret: true, placeholder: "xoxb-..." },
+    ],
+  },
+  {
+    id: "teams",
+    name: "Microsoft Teams",
+    description: "Connect your Teams tenant once; projects then point at their own channels.",
+    available: true,
+    fields: [
+      { key: "tenantId", label: "Tenant ID", type: "text", secret: false, placeholder: "00000000-0000-0000-0000-000000000000" },
+      { key: "clientId", label: "Client (application) ID", type: "text", secret: false, placeholder: "app registration client id" },
+      { key: "clientSecret", label: "Client secret", type: "password", secret: true, placeholder: "client secret value" },
+    ],
+  },
   { id: "anthropic", name: "Anthropic", description: "LLM provider for AI generation.", available: false, fields: [] },
   { id: "jira", name: "Jira", description: "Sync stories to your Jira board.", available: false, fields: [] },
-  { id: "slack", name: "Slack", description: "Post delivery updates to Slack.", available: false, fields: [] },
 ];
 
 export function getProvider(id: string) {
