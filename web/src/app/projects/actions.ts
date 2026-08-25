@@ -17,7 +17,7 @@ export async function createProject(input: {
   currency: string;
   startDate?: string | null;
   endDate?: string | null;
-  memberIds: string[];
+  members: Array<{ userId: string; rate?: number | null; timezone?: string | null }>;
 }) {
   const m = await getActiveMembership();
   if (!m?.orgId) return { error: "No workspace found." };
@@ -40,11 +40,15 @@ export async function createProject(input: {
   });
 
   const valid = await orgMemberIds(m.orgId);
-  const ids = Array.from(new Set([m.userId, ...(input.memberIds || [])])).filter((u) => valid.has(u));
-  for (const userId of ids) {
+  const byId = new Map<string, { rate: number | null; timezone: string | null }>();
+  for (const r of input.members || []) {
+    if (valid.has(r.userId)) byId.set(r.userId, { rate: r.rate ?? null, timezone: r.timezone ?? null });
+  }
+  if (!byId.has(m.userId)) byId.set(m.userId, { rate: null, timezone: null });
+  for (const [userId, v] of byId) {
     await db
       .insert(projectMember)
-      .values({ id: crypto.randomUUID(), projectId: id, userId })
+      .values({ id: crypto.randomUUID(), projectId: id, userId, rate: v.rate, timezone: v.timezone })
       .onConflictDoNothing();
   }
 
@@ -61,14 +65,19 @@ async function canManageProject(projectId: string) {
   return null;
 }
 
-export async function addProjectMember(projectId: string, userId: string) {
+export async function addProjectMember(
+  projectId: string,
+  userId: string,
+  rate?: number | null,
+  timezone?: string | null,
+) {
   const m = await canManageProject(projectId);
   if (!m?.orgId) return { error: "Not allowed." };
   const valid = await orgMemberIds(m.orgId);
   if (!valid.has(userId)) return { error: "That person isn't in this workspace." };
   await db
     .insert(projectMember)
-    .values({ id: crypto.randomUUID(), projectId, userId })
+    .values({ id: crypto.randomUUID(), projectId, userId, rate: rate ?? null, timezone: timezone ?? null })
     .onConflictDoNothing();
   return { ok: true };
 }
@@ -78,6 +87,21 @@ export async function removeProjectMember(projectId: string, userId: string) {
   if (!m) return { error: "Not allowed." };
   await db
     .delete(projectMember)
+    .where(and(eq(projectMember.projectId, projectId), eq(projectMember.userId, userId)));
+  return { ok: true };
+}
+
+export async function updateProjectMember(
+  projectId: string,
+  userId: string,
+  rate: number | null,
+  timezone: string | null,
+) {
+  const m = await canManageProject(projectId);
+  if (!m) return { error: "Not allowed." };
+  await db
+    .update(projectMember)
+    .set({ rate, timezone })
     .where(and(eq(projectMember.projectId, projectId), eq(projectMember.userId, userId)));
   return { ok: true };
 }

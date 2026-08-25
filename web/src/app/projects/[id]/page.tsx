@@ -5,6 +5,7 @@ import { getActiveMembership, canManageOrg } from "@/lib/auth-server";
 import { db } from "@/lib/db";
 import { project, projectMember, member, user } from "@/lib/db/schema";
 import { formatBudget } from "@/lib/currencies";
+import { isoToMmddyyyy } from "@/lib/dates";
 import ProjectMembersClient from "./project-members-client";
 
 export default async function ProjectPage({ params }: { params: Promise<{ id: string }> }) {
@@ -16,7 +17,13 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
   if (!p || p.organizationId !== m.orgId) notFound();
 
   const members = await db
-    .select({ userId: projectMember.userId, name: user.name, email: user.email })
+    .select({
+      userId: projectMember.userId,
+      name: user.name,
+      email: user.email,
+      rate: projectMember.rate,
+      timezone: projectMember.timezone,
+    })
     .from(projectMember)
     .innerJoin(user, eq(user.id, projectMember.userId))
     .where(eq(projectMember.projectId, id));
@@ -47,13 +54,13 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
         <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
           <Field label="Budget" value={formatBudget(p.budget, p.currency)} />
           <Field label="Currency" value={p.currency} />
-          <Field label="Expected start" value={p.startDate ?? "—"} />
-          <Field label="Expected end" value={p.endDate ?? "—"} />
+          <Field label="Expected start" value={isoToMmddyyyy(p.startDate) || "—"} />
+          <Field label="Expected end" value={isoToMmddyyyy(p.endDate) || "—"} />
         </div>
         <p className="mt-4 text-xs text-neutral-400">Project ID: <span className="font-mono">{p.id}</span></p>
 
         <div className="mt-8">
-          <ProjectMembersClient projectId={id} members={members} addable={addable} canManage={canManage} />
+          <ProjectMembersClient projectId={id} members={members} addable={addable} canManage={canManage} currency={p.currency} />
         </div>
       </div>
     </main>

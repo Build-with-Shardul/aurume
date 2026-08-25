@@ -258,6 +258,8 @@ export const projectMember = pgTable(
     userId: text("user_id")
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
+    rate: integer("rate"), // hourly rate, in the project's currency
+    timezone: text("timezone"), // IANA tz, e.g. "America/New_York"
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (t) => [

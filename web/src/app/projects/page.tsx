@@ -5,6 +5,7 @@ import { getSession, getActiveMembership, canCreateProject } from "@/lib/auth-se
 import { db } from "@/lib/db";
 import { project } from "@/lib/db/schema";
 import { formatBudget } from "@/lib/currencies";
+import { isoToMmddyyyy } from "@/lib/dates";
 
 export default async function ProjectsPage() {
   const session = await getSession();
@@ -52,7 +53,7 @@ export default async function ProjectsPage() {
                 {p.description && <p className="mt-1 line-clamp-2 text-sm text-neutral-500">{p.description}</p>}
                 <div className="mt-3 flex flex-wrap gap-3 text-xs text-neutral-500">
                   <span>{formatBudget(p.budget, p.currency)}</span>
-                  {p.startDate && <span>{p.startDate}{p.endDate ? ` → ${p.endDate}` : ""}</span>}
+                  {p.startDate && <span>{isoToMmddyyyy(p.startDate)}{p.endDate ? ` → ${isoToMmddyyyy(p.endDate)}` : ""}</span>}
                 </div>
               </Link>
             ))}
