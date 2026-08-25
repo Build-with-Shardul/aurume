@@ -101,3 +101,26 @@ export const ASSIGNABLE_ROLES = [
   "viewer",
 ] as const;
 export type AssignableRole = (typeof ASSIGNABLE_ROLES)[number];
+
+// Discipline / job title — DESCRIPTIVE only (drives resourcing later, grants no permissions).
+// Growable; separate from the permission role above (ADR 0001).
+export const DISCIPLINES = [
+  { value: "product_manager", label: "Product Manager" },
+  { value: "project_manager", label: "Project Manager" },
+  { value: "scrum_master", label: "Scrum Master" },
+  { value: "business_analyst", label: "Business Analyst" },
+  { value: "ux_designer", label: "UX Designer" },
+  { value: "frontend_developer", label: "Frontend Developer" },
+  { value: "backend_developer", label: "Backend Developer" },
+  { value: "qa_manual", label: "QA (Manual)" },
+  { value: "qa_automation", label: "QA (Automation)" },
+  { value: "devops", label: "DevOps" },
+  { value: "engineering_manager", label: "Engineering Manager" },
+  { value: "engineering_director", label: "Engineering Director" },
+  { value: "stakeholder", label: "Stakeholder" },
+  { value: "other", label: "Other" },
+] as const;
+
+export const DISCIPLINE_LABEL: Record<string, string> = Object.fromEntries(
+  DISCIPLINES.map((d) => [d.value, d.label]),
+);

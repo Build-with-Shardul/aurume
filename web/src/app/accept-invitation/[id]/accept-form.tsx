@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { authClient, signUp } from "@/lib/auth-client";
+import { applyInvitationDiscipline } from "./actions";
 
 export default function AcceptForm({
   invitationId,
@@ -40,6 +41,9 @@ export default function AcceptForm({
       setBusy(false);
       return setErr(acc.error.message || "Could not accept the invitation");
     }
+
+    // Copy the discipline (job title) from the invitation onto the new member.
+    await applyInvitationDiscipline(invitationId);
 
     router.push("/");
     router.refresh();

@@ -1,6 +1,7 @@
 import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { invitation, organization } from "@/lib/db/schema";
+import { DISCIPLINE_LABEL } from "@/lib/permissions";
 import AcceptForm from "./accept-form";
 
 function Notice({ title, body }: { title: string; body: string }) {
@@ -21,6 +22,7 @@ export default async function AcceptPage({ params }: { params: Promise<{ id: str
     .select({
       email: invitation.email,
       role: invitation.role,
+      discipline: invitation.discipline,
       status: invitation.status,
       expiresAt: invitation.expiresAt,
       orgName: organization.name,
@@ -42,8 +44,9 @@ export default async function AcceptPage({ params }: { params: Promise<{ id: str
       <div className="w-full max-w-sm">
         <h1 className="text-xl font-semibold">Join {inv.orgName}</h1>
         <p className="mt-1 mb-6 text-sm text-neutral-500">
-          You&apos;ve been invited as <span className="font-medium capitalize">{inv.role ?? "member"}</span>. Set a
-          password to accept.
+          You&apos;ve been invited as{" "}
+          <span className="font-medium capitalize">{inv.role ?? "member"}</span>
+          {inv.discipline ? ` · ${DISCIPLINE_LABEL[inv.discipline] ?? inv.discipline}` : ""}. Set a password to accept.
         </p>
         <AcceptForm invitationId={id} email={inv.email} role={inv.role ?? "member"} />
       </div>

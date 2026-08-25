@@ -23,6 +23,17 @@ export const auth = betterAuth({
       ac,
       roles,
       sendInvitationEmail,
+      // Discipline (job title) rides alongside the permission role. `input: true` on the
+      // invitation lets the admin set it when inviting; on the member it's copied over at
+      // accept time (see accept-invitation server action).
+      schema: {
+        invitation: {
+          additionalFields: { discipline: { type: "string", required: false, input: true } },
+        },
+        member: {
+          additionalFields: { discipline: { type: "string", required: false, input: false } },
+        },
+      },
     }),
     // Instance-level Super Admin: user management across the platform.
     admin(),
