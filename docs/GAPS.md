@@ -128,7 +128,6 @@ The knowledge space works for upload/note/list/download/delete and org rollup. M
 
 | Item | Detail |
 |---|---|
-| **Type error in super-admin** | `web/src/app/superadmin/superadmin-client.tsx:97` — a server action returning `{ ok: true }` is passed where `void \| { error? }` is expected (TS2322). Pre-existing; harmless at runtime but should be fixed (align the action's return type or the caller). |
 | **`getKnowledgeForAI` scaling** | Concatenates all org rows with content and filters in JS — fine now, needs chunking/embeddings before real corpora (see §3). |
 | **No connector "in use" guard** | Disconnecting a connector doesn't check whether projects reference it (e.g. bound Slack channels). |
 

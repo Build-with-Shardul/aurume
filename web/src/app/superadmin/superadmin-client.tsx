@@ -13,7 +13,7 @@ export default function SuperadminClient({ orgs, users, meId }: { orgs: Org[]; u
   const [busy, setBusy] = useState<string>("");
   const [err, setErr] = useState("");
 
-  async function run(id: string, fn: () => Promise<{ error?: string } | void>) {
+  async function run(id: string, fn: () => Promise<{ error?: string; ok?: boolean } | void>) {
     setBusy(id);
     setErr("");
     try {
