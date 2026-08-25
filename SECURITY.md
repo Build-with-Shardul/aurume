@@ -12,7 +12,7 @@ Report privately by either:
 
 - Using GitHub's **[Report a vulnerability]** button (Security → Advisories) on the
   affected repository, or
-- Emailing **security@buildwithshardul.com** with details and reproduction steps.
+- Emailing **admin@buildwithshardul.com** with details and reproduction steps.
 
 Please include: the affected repo and version, a description, reproduction steps or
 a proof of concept, and the impact you foresee. We aim to acknowledge within
