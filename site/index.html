@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Aurume — idea to delivery, with lineage</title>
+<meta name="description" content="Open-source AI product-management platform. Carry a feature from idea to delivery as a chain of connected, approved, traceable artifacts.">
+<meta property="og:title" content="Aurume">
+<meta property="og:description" content="The planning and traceability layer that sits above your execution tool. Open source, AGPLv3.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://aurume.dev">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#08060d; --surface:#111019; --line:rgba(255,255,255,.10); --line-strong:rgba(255,255,255,.22);
+    --ink:#fff; --body:rgba(255,255,255,.72); --muted:rgba(255,255,255,.52); --faint:rgba(255,255,255,.34);
+    --accent:#fff; --on-accent:#08060d; --ok:#3fb950;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;background:var(--bg);color:var(--body);font-family:"Inter",ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;line-height:1.6;-webkit-font-smoothing:antialiased}
+  a{color:inherit}
+  .wrap{max-width:920px;margin:0 auto;padding:0 24px}
+  h1,h2,h3{color:var(--ink);letter-spacing:-.02em;line-height:1.1}
+  .eyebrow{font-size:12px;text-transform:uppercase;letter-spacing:.18em;color:var(--muted);font-weight:600}
+
+  /* nav */
+  nav{position:sticky;top:0;z-index:10;backdrop-filter:blur(12px);background:rgba(8,6,13,.7);border-bottom:1px solid transparent}
+  nav.scrolled{border-bottom-color:var(--line)}
+  .nav-inner{display:flex;align-items:center;justify-content:space-between;height:64px}
+  .brand{font-weight:700;color:var(--ink);font-size:19px;letter-spacing:-.02em;text-decoration:none}
+  .nav-links{display:flex;gap:22px;align-items:center;font-size:14px}
+  .nav-links a{color:var(--body);text-decoration:none}
+  .nav-links a:hover{color:var(--ink)}
+  .btn{display:inline-flex;align-items:center;gap:8px;text-decoration:none;font-weight:500;border-radius:9px;padding:11px 18px;font-size:14px;transition:.15s}
+  .btn-primary{background:var(--accent);color:var(--on-accent)}
+  .btn-primary:hover{background:#f0f0ec}
+  .btn-ghost{border:1px solid var(--line-strong);color:rgba(255,255,255,.9)}
+  .btn-ghost:hover{background:rgba(255,255,255,.06);border-color:var(--line-strong)}
+
+  /* hero */
+  .hero{padding:96px 0 72px;text-align:center;background:radial-gradient(ellipse 70% 55% at 50% -10%,rgba(255,255,255,.05),transparent 70%)}
+  .hero h1{font-size:clamp(38px,7vw,68px);font-weight:700;margin:18px 0 0}
+  .hero p.lead{font-size:clamp(17px,2.2vw,21px);color:var(--body);max-width:640px;margin:22px auto 0}
+  .cta{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-top:34px}
+
+  /* pull quote */
+  .quote{margin:8px 0 0;padding:64px 0}
+  .quote blockquote{margin:0;border-left:2px solid var(--line-strong);padding-left:24px;font-size:clamp(19px,2.6vw,26px);color:var(--ink);font-weight:500;letter-spacing:-.01em;line-height:1.4}
+  .quote .who{color:var(--muted);font-size:15px;margin-top:14px;font-weight:400}
+
+  /* sections */
+  section.block{padding:56px 0;border-top:1px solid var(--line)}
+  section.block h2{font-size:clamp(24px,4vw,32px);font-weight:700;margin:0 0 8px}
+  section.block > .wrap > p.sub{color:var(--muted);margin:0 0 32px;max-width:640px}
+  .grid{display:grid;grid-template-columns:repeat(2,1fr);gap:16px}
+  @media(max-width:640px){.grid{grid-template-columns:1fr}}
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:22px}
+  .card h3{font-size:17px;margin:0 0 6px}
+  .card p{margin:0;font-size:14.5px;color:var(--body)}
+
+  /* roadmap */
+  .road{display:flex;flex-direction:column;gap:2px}
+  .road-row{display:flex;align-items:center;gap:14px;padding:14px 4px;border-bottom:1px solid var(--line)}
+  .road-row:last-child{border-bottom:none}
+  .road-name{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:14px;color:var(--ink);flex:none;min-width:170px}
+  .road-what{color:var(--body);font-size:14px;flex:1}
+  .status{flex:none;font-size:11.5px;text-transform:uppercase;letter-spacing:.08em;border:1px solid var(--line);border-radius:999px;padding:3px 10px;color:var(--faint)}
+  .status.now{color:var(--ok);border-color:color-mix(in srgb,var(--ok) 45%,var(--line))}
+  @media(max-width:640px){.road-name{min-width:130px}.road-what{display:none}}
+
+  /* footer */
+  footer{border-top:1px solid var(--line);padding:48px 0 64px;margin-top:24px}
+  footer .row{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap;align-items:center}
+  footer a{color:var(--body);text-decoration:none;border-bottom:1px solid transparent}
+  footer a:hover{color:var(--ink);border-bottom-color:var(--line-strong)}
+  .foot-attr{font-size:14px;max-width:520px}
+  .foot-attr strong{color:var(--ink);font-weight:600}
+  .foot-meta{font-size:13px;color:var(--faint)}
+</style>
+</head>
+<body>
+<nav id="nav">
+  <div class="wrap nav-inner">
+    <a class="brand" href="/">Aurume</a>
+    <div class="nav-links">
+      <a href="#how">How</a>
+      <a href="#roadmap">Roadmap</a>
+      <a class="btn btn-ghost" href="https://github.com/Build-with-Shardul/aurume" target="_blank" rel="noopener">GitHub ↗</a>
+    </div>
+  </div>
+</nav>
+
+<header class="hero">
+  <div class="wrap">
+    <span class="eyebrow">Open-source · AGPLv3 · Building in public</span>
+    <h1>Idea to delivery,<br>with lineage.</h1>
+    <p class="lead">An open-source platform for product managers that carries a feature from idea to delivery as a chain of connected, approved artifacts — where every AI step is grounded in the approved artifact above it.</p>
+    <div class="cta">
+      <a class="btn btn-primary" href="https://github.com/Build-with-Shardul/aurume" target="_blank" rel="noopener">View on GitHub</a>
+      <a class="btn btn-ghost" href="https://github.com/Build-with-Shardul/aurume/blob/main/docs/PROJECT_PLAN.md" target="_blank" rel="noopener">Read the plan</a>
+    </div>
+  </div>
+</header>
+
+<div class="quote">
+  <div class="wrap">
+    <blockquote>ChatGPT can write a PRD. It can't tell you which approved requirement it came from, who signed off, and what changed since. Aurume can.</blockquote>
+    <div class="who">The differentiator isn't any single AI feature — it's <strong style="color:var(--ink);font-weight:500">lineage</strong>: requirement → test → live pass/fail, with versions.</div>
+  </div>
+</div>
+
+<section class="block" id="how">
+  <div class="wrap">
+    <span class="eyebrow">How it's built</span>
+    <h2>Evidence over autonomy.</h2>
+    <p class="sub">A few principles, decided up front. The full rationale lives in the plan.</p>
+    <div class="grid">
+      <div class="card"><h3>Agents propose, humans commit</h3><p>A stateful workflow with human-in-the-loop approval gates — not an autonomous agent. An agent never passes a gate or writes to the board on its own.</p></div>
+      <div class="card"><h3>Benchmarked, not demoed</h3><p>Every AI step ships with groundedness scores, cost per generation, and documented failures — the numbers that show the thinking.</p></div>
+      <div class="card"><h3>Bring your own key</h3><p>OpenAI, Anthropic, or fully local via Ollama. Self-hostable in one command, so no data need leave your environment.</p></div>
+      <div class="card"><h3>Deterministic where it counts</h3><p>Scheduling and cost math are arithmetic, not LLM guesses. The model is used only where judgement genuinely helps.</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="block" id="roadmap">
+  <div class="wrap">
+    <span class="eyebrow">Roadmap</span>
+    <h2>Shipped in the open, one repo at a time.</h2>
+    <p class="sub">The AI capabilities ship as independent, documented, benchmarked repositories first; the platform assembles them. Honest status — only what exists is marked so.</p>
+    <div class="road">
+      <div class="road-row"><span class="road-name">playbook-drafter</span><span class="road-what">Template-driven structured playbook generation</span><span class="status now">In progress</span></div>
+      <div class="road-row"><span class="road-name">spec-to-stories</span><span class="road-what">Grounded story generation with citations (RAG)</span><span class="status">Planned</span></div>
+      <div class="road-row"><span class="road-name">story-to-tests</span><span class="road-what">Test cases + traceability matrix</span><span class="status">Planned</span></div>
+      <div class="road-row"><span class="road-name">delivery-evals</span><span class="road-what">Groundedness / faithfulness evaluation harness</span><span class="status">Planned</span></div>
+      <div class="road-row"><span class="road-name">delivery-graph</span><span class="road-what">Workflow orchestration, approval gates, resume</span><span class="status">Planned</span></div>
+      <div class="road-row"><span class="road-name">aurume</span><span class="road-what">The platform shell that assembles the above</span><span class="status">Planned</span></div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap row">
+    <div class="foot-attr">Aurume is built by <strong>Shardul Nerlekar</strong>, a Senior AI Product Manager, as an open exploration of AI in product delivery. Follow the build at <a href="https://buildwithshardul.com" target="_blank" rel="noopener">buildwithshardul.com</a>.</div>
+    <div class="foot-meta">AGPLv3 · © 2026 Shardul Nerlekar</div>
+  </div>
+</footer>
+
+<script>
+  var nav=document.getElementById('nav');
+  var onScroll=function(){ nav.classList.toggle('scrolled', window.scrollY>8); };
+  window.addEventListener('scroll',onScroll,{passive:true}); onScroll();
+</script>
+</body>
+</html>
