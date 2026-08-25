@@ -4,6 +4,8 @@ import {
   text,
   timestamp,
   boolean,
+  integer,
+  date,
   jsonb,
   index,
   uniqueIndex,
@@ -223,4 +225,43 @@ export const discipline = pgTable(
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (t) => [uniqueIndex("discipline_org_value_uidx").on(t.organizationId, t.value)],
+);
+
+// --- Aurume: projects (root of the delivery/artifact chain) + their members. ---
+export const project = pgTable(
+  "project",
+  {
+    id: text("id").primaryKey(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    description: text("description"),
+    budget: integer("budget"), // whole currency units
+    currency: text("currency").default("USD").notNull(),
+    startDate: date("start_date"),
+    endDate: date("end_date"),
+    createdBy: text("created_by").references(() => user.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (t) => [index("project_org_idx").on(t.organizationId)],
+);
+
+export const projectMember = pgTable(
+  "project_member",
+  {
+    id: text("id").primaryKey(),
+    projectId: text("project_id")
+      .notNull()
+      .references(() => project.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => [
+    uniqueIndex("project_member_uidx").on(t.projectId, t.userId),
+    index("project_member_project_idx").on(t.projectId),
+  ],
 );

@@ -37,6 +37,11 @@ export function canManageOrg(role: string | null) {
   return role === "owner" || role === "admin";
 }
 
+/** owner/admin/manager can create projects (capability matrix, ADR 0001). */
+export function canCreateProject(role: string | null) {
+  return role === "owner" || role === "admin" || role === "manager";
+}
+
 /** The current user's INSTANCE role (user.role: "admin" = platform Super Admin). */
 export async function getInstanceRole() {
   const session = await getSession();

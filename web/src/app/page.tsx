@@ -60,22 +60,30 @@ export default async function Home() {
                 {m.role}
               </span>
             </div>
-            {canManage && (
-              <div className="mt-5 flex flex-wrap gap-3">
+            <div className="mt-5 flex flex-wrap gap-3">
+              <Link
+                href="/projects"
+                className="inline-block rounded-lg bg-neutral-900 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-800"
+              >
+                Projects →
+              </Link>
+              {canManage && (
                 <Link
                   href="/admin/people"
-                  className="inline-block rounded-lg bg-neutral-900 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-800"
+                  className="inline-block rounded-lg border border-neutral-300 px-4 py-2 text-sm font-medium text-neutral-800 hover:bg-neutral-50"
                 >
-                  Manage people →
+                  Manage people
                 </Link>
+              )}
+              {canManage && (
                 <Link
                   href="/settings/connectors"
                   className="inline-block rounded-lg border border-neutral-300 px-4 py-2 text-sm font-medium text-neutral-800 hover:bg-neutral-50"
                 >
                   Connectors
                 </Link>
-              </div>
-            )}
+              )}
+            </div>
           </div>
         ) : (
           <p className="mt-4 text-neutral-500">You&apos;re not part of a workspace yet.</p>
