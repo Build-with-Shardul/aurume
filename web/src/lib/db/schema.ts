@@ -269,3 +269,28 @@ export const projectMember = pgTable(
     index("project_member_project_idx").on(t.projectId),
   ],
 );
+
+// A project's knowledge space: uploaded files + notes + (later) synced Slack/Teams
+// messages. `content` holds extractable text the AI can reference; `storageKey`
+// points at the blob in the storage backend for file items.
+export const knowledgeItem = pgTable(
+  "knowledge_item",
+  {
+    id: text("id").primaryKey(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    projectId: text("project_id")
+      .notNull()
+      .references(() => project.id, { onDelete: "cascade" }),
+    source: text("source").notNull().default("upload"), // upload | note | slack | teams
+    title: text("title").notNull(), // file name, note title, or message summary
+    mimeType: text("mime_type"),
+    sizeBytes: integer("size_bytes"),
+    storageKey: text("storage_key"), // key in the storage backend (null for notes/messages)
+    content: text("content"), // extracted/plain text for AI retrieval
+    uploadedBy: text("uploaded_by").references(() => user.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => [index("knowledge_item_project_idx").on(t.projectId)],
+);

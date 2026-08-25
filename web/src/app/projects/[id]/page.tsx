@@ -3,7 +3,7 @@ import Link from "next/link";
 import { eq } from "drizzle-orm";
 import { getActiveMembership, canManageOrg } from "@/lib/auth-server";
 import { db } from "@/lib/db";
-import { project, projectMember } from "@/lib/db/schema";
+import { project, projectMember, knowledgeItem } from "@/lib/db/schema";
 import { formatBudget } from "@/lib/currencies";
 import { isoToMmddyyyy, isProjectStarted } from "@/lib/dates";
 
@@ -17,6 +17,9 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
 
   const memberCount = (
     await db.select({ userId: projectMember.userId }).from(projectMember).where(eq(projectMember.projectId, id))
+  ).length;
+  const knowledgeCount = (
+    await db.select({ id: knowledgeItem.id }).from(knowledgeItem).where(eq(knowledgeItem.projectId, id))
   ).length;
 
   const canManage = canManageOrg(m.role) || p.createdBy === m.userId;
@@ -58,6 +61,22 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
           <Field label="Expected end" value={isoToMmddyyyy(p.endDate) || "—"} />
         </div>
         <p className="mt-4 text-xs text-neutral-400">Project ID: <span className="font-mono">{p.id}</span></p>
+
+        <Link
+          href={`/projects/${id}/knowledge`}
+          className="mt-6 flex items-center justify-between rounded-xl border border-neutral-200 bg-white p-5 hover:border-neutral-400"
+        >
+          <div>
+            <div className="font-medium">📚 Knowledge space</div>
+            <p className="mt-1 text-sm text-neutral-500">
+              Upload docs, spreadsheets, PDFs, images — anything. Aurume references it when drafting playbooks.
+            </p>
+          </div>
+          <div className="shrink-0 text-right">
+            <div className="text-lg font-semibold">{knowledgeCount}</div>
+            <div className="text-xs text-neutral-400">item{knowledgeCount === 1 ? "" : "s"}</div>
+          </div>
+        </Link>
 
         <p className="mt-6 text-sm text-neutral-500">
           Members, budget and timeline are managed in{" "}
