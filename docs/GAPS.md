@@ -97,7 +97,7 @@ The knowledge space works for upload/note/list/download/delete and org rollup. M
 | **SSO / SAML / OIDC** | Deferred by decision; Better Auth architecture is ready. Add when a customer IdP is real. | L |
 | **Audit log** | No trail of who did what (invites, role changes, deletes, impersonation, connector edits). Critical for the gated-enterprise target. | L |
 | **Impersonation logging** | Super-admin impersonation works but isn't recorded. | S |
-| **Secret-key management** | Connector secrets are AES-GCM encrypted with `BETTER_AUTH_SECRET` ([`crypto.ts`](../web/src/lib/crypto.ts)). **Rotating that secret silently breaks every stored connector** — no re-encryption path, no envelope keys. | M |
+| **Secret-key management** | ✅ *Done* — connector secrets now use **envelope encryption** ([`crypto.ts`](../web/src/lib/crypto.ts)): per-secret data keys wrapped by a KEK from a dedicated `AURUME_ENCRYPTION_KEY` (falls back to `BETTER_AUTH_SECRET`). Auth-secret rotation no longer breaks connectors; `AURUME_ENCRYPTION_KEY` rotation only re-wraps data keys (Platform admin → "Re-wrap connector secrets", with `AURUME_ENCRYPTION_KEY_RETIRED`). Remaining: a real KMS/HSM backend for the KEK (currently env-derived). | — |
 | **Real email sending** | Invites fall back to console when Resend isn't configured ([`email.ts`](../web/src/lib/email.ts)). No verified-domain send, templates, or delivery handling. | S |
 | **Data export / deletion (GDPR)** | No per-user/org export or right-to-erasure flow. | M |
 | **Rate limiting / abuse** | No rate limiting on auth, uploads, or actions. | M |

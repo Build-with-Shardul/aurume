@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { authClient } from "@/lib/auth-client";
-import { setInstanceAdmin, setBanned, deleteOrganization } from "./actions";
+import { setInstanceAdmin, setBanned, deleteOrganization, rewrapConnectorSecrets } from "./actions";
 
 type Org = { id: string; name: string; slug: string; members: number; createdAt: string | null };
 type User = { id: string; email: string; name: string; role: string; banned: boolean };
@@ -12,6 +12,21 @@ export default function SuperadminClient({ orgs, users, meId }: { orgs: Org[]; u
   const router = useRouter();
   const [busy, setBusy] = useState<string>("");
   const [err, setErr] = useState("");
+  const [rewrapMsg, setRewrapMsg] = useState("");
+
+  async function rewrap() {
+    setBusy("rewrap");
+    setErr("");
+    setRewrapMsg("");
+    try {
+      const r = await rewrapConnectorSecrets();
+      if (r && "error" in r && r.error) setErr(r.error);
+      else if (r && "ok" in r) setRewrapMsg(`Re-wrapped ${r.rewrapped} of ${r.total} connector secret${r.total === 1 ? "" : "s"} under the current key.`);
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Re-wrap failed");
+    }
+    setBusy("");
+  }
 
   async function run(id: string, fn: () => Promise<{ error?: string; ok?: boolean } | void>) {
     setBusy(id);
@@ -41,6 +56,23 @@ export default function SuperadminClient({ orgs, users, meId }: { orgs: Org[]; u
   return (
     <div className="mt-8 space-y-8">
       {err && <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{err}</p>}
+
+      {/* Security / key rotation */}
+      <div className="rounded-xl border border-neutral-200 bg-white px-6 py-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <div className="text-sm font-medium">Connector encryption</div>
+            <p className="mt-0.5 text-xs text-neutral-500">
+              After rotating <span className="font-mono">AURUME_ENCRYPTION_KEY</span> (keep the old value in{" "}
+              <span className="font-mono">AURUME_ENCRYPTION_KEY_RETIRED</span>), re-wrap secrets under the new key.
+            </p>
+          </div>
+          <button onClick={rewrap} disabled={busy === "rewrap"} className={btn}>
+            {busy === "rewrap" ? "Re-wrapping…" : "Re-wrap connector secrets"}
+          </button>
+        </div>
+        {rewrapMsg && <p className="mt-2 rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-xs text-green-700">{rewrapMsg}</p>}
+      </div>
 
       {/* Users */}
       <div className="rounded-xl border border-neutral-200 bg-white">
