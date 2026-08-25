@@ -1,20 +1,22 @@
 "use client";
 
 import { useRef, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { addKnowledgeNote, deleteKnowledgeItem } from "./actions";
 
-type Item = {
+export type KnowledgeItemView = {
   id: string;
   source: string;
   title: string;
   mimeType: string | null;
   sizeBytes: number | null;
   storageKey: string | null;
-  uploadedBy: string | null;
   uploaderName: string | null;
   uploaderEmail: string | null;
   createdAt: Date | string;
+  canDelete: boolean;
+  scopeLabel?: string | null; // e.g. project name or "Org-wide" (org view only)
+  scopeHref?: string | null; // link to the owning project, if any
 };
 
 const SOURCE_LABEL: Record<string, { label: string; cls: string }> = {
@@ -32,15 +34,19 @@ function fmtBytes(n: number | null) {
 }
 
 export default function KnowledgeClient({
-  projectId,
   items,
-  meId,
-  canManage,
+  uploadUrl,
+  downloadBase,
+  addNoteAction,
+  deleteAction,
+  emptyHint,
 }: {
-  projectId: string;
-  items: Item[];
-  meId: string;
-  canManage: boolean;
+  items: KnowledgeItemView[];
+  uploadUrl: string;
+  downloadBase: string; // download href = `${downloadBase}/${item.id}`
+  addNoteAction: (title: string, content: string) => Promise<{ error?: string; ok?: boolean } | void>;
+  deleteAction: (itemId: string) => Promise<{ error?: string; ok?: boolean } | void>;
+  emptyHint: string;
 }) {
   const router = useRouter();
   const fileRef = useRef<HTMLInputElement>(null);
@@ -57,7 +63,7 @@ export default function KnowledgeClient({
     for (const file of Array.from(files)) {
       const fd = new FormData();
       fd.append("file", file);
-      const res = await fetch(`/api/projects/${projectId}/knowledge`, { method: "POST", body: fd });
+      const res = await fetch(uploadUrl, { method: "POST", body: fd });
       if (!res.ok) {
         const j = await res.json().catch(() => ({}));
         setErr(j.error || `Failed to upload ${file.name}.`);
@@ -72,7 +78,7 @@ export default function KnowledgeClient({
   async function saveNote() {
     setErr("");
     setBusy(true);
-    const r = await addKnowledgeNote(projectId, noteTitle, noteBody);
+    const r = await addNoteAction(noteTitle, noteBody);
     setBusy(false);
     if (r?.error) return setErr(r.error);
     setNoteTitle("");
@@ -84,7 +90,7 @@ export default function KnowledgeClient({
   async function remove(id: string) {
     setErr("");
     setBusy(true);
-    const r = await deleteKnowledgeItem(projectId, id);
+    const r = await deleteAction(id);
     setBusy(false);
     if (r?.error) return setErr(r.error);
     router.refresh();
@@ -138,21 +144,26 @@ export default function KnowledgeClient({
 
       <div className="mt-6 rounded-xl border border-neutral-200 bg-white">
         {items.length === 0 ? (
-          <p className="px-6 py-10 text-center text-sm text-neutral-400">
-            Nothing here yet. Upload documents, spreadsheets, PDFs, images — anything the team knows about this project.
-          </p>
+          <p className="px-6 py-10 text-center text-sm text-neutral-400">{emptyHint}</p>
         ) : (
           <ul className="divide-y divide-neutral-100">
             {items.map((it) => {
               const badge = SOURCE_LABEL[it.source] ?? SOURCE_LABEL.upload;
-              const canDelete = it.uploadedBy === meId || canManage;
               return (
                 <li key={it.id} className="flex items-center justify-between gap-3 px-6 py-3">
                   <div className="min-w-0">
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                       <span className={`rounded px-1.5 py-0.5 text-[11px] font-medium ${badge.cls}`}>{badge.label}</span>
+                      {it.scopeLabel &&
+                        (it.scopeHref ? (
+                          <Link href={it.scopeHref} className="rounded bg-neutral-100 px-1.5 py-0.5 text-[11px] font-medium text-neutral-600 hover:bg-neutral-200">
+                            {it.scopeLabel}
+                          </Link>
+                        ) : (
+                          <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[11px] font-medium text-amber-700">{it.scopeLabel}</span>
+                        ))}
                       {it.storageKey ? (
-                        <a href={`/api/projects/${projectId}/knowledge/${it.id}`} target="_blank" rel="noreferrer" className="truncate text-sm font-medium text-neutral-900 hover:underline">
+                        <a href={`${downloadBase}/${it.id}`} target="_blank" rel="noreferrer" className="truncate text-sm font-medium text-neutral-900 hover:underline">
                           {it.title}
                         </a>
                       ) : (
@@ -167,7 +178,7 @@ export default function KnowledgeClient({
                       {new Date(it.createdAt).toLocaleDateString()}
                     </div>
                   </div>
-                  {canDelete && (
+                  {it.canDelete && (
                     <button
                       onClick={() => remove(it.id)}
                       disabled={busy}

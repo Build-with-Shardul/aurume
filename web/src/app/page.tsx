@@ -67,6 +67,12 @@ export default async function Home() {
               >
                 Projects →
               </Link>
+              <Link
+                href="/knowledge"
+                className="inline-block rounded-lg border border-neutral-300 px-4 py-2 text-sm font-medium text-neutral-800 hover:bg-neutral-50"
+              >
+                Organization knowledge
+              </Link>
               {canManage && (
                 <Link
                   href="/admin/people"

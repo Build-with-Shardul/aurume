@@ -280,9 +280,8 @@ export const knowledgeItem = pgTable(
     organizationId: text("organization_id")
       .notNull()
       .references(() => organization.id, { onDelete: "cascade" }),
-    projectId: text("project_id")
-      .notNull()
-      .references(() => project.id, { onDelete: "cascade" }),
+    // null = organization-level knowledge (not tied to a single project)
+    projectId: text("project_id").references(() => project.id, { onDelete: "cascade" }),
     source: text("source").notNull().default("upload"), // upload | note | slack | teams
     title: text("title").notNull(), // file name, note title, or message summary
     mimeType: text("mime_type"),
@@ -292,5 +291,8 @@ export const knowledgeItem = pgTable(
     uploadedBy: text("uploaded_by").references(() => user.id, { onDelete: "set null" }),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
-  (t) => [index("knowledge_item_project_idx").on(t.projectId)],
+  (t) => [
+    index("knowledge_item_project_idx").on(t.projectId),
+    index("knowledge_item_org_idx").on(t.organizationId),
+  ],
 );
