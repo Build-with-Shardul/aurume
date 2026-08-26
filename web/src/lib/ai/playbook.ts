@@ -124,15 +124,28 @@ export function buildPlaybookPrompt(
     .join("\n");
 }
 
+/** All valid knowledge refs the playbook actually used — from the citations array AND
+ *  inline [Kn] mentions in any text field (models often cite inline). */
+export function citedRefs(content: PlaybookContent, validRefs: Set<string>): string[] {
+  const found = new Set<string>();
+  for (const c of content.citations) if (validRefs.has(c)) found.add(c);
+  for (const m of JSON.stringify(content).matchAll(/\bK(\d+)\b/g)) {
+    const ref = `K${m[1]}`;
+    if (validRefs.has(ref)) found.add(ref);
+  }
+  return [...found].sort((a, b) => Number(a.slice(1)) - Number(b.slice(1)));
+}
+
 /** Groundedness = how much of the available knowledge the playbook actually cited. 0–100. */
 export function scoreGroundedness(content: PlaybookContent, validRefs: Set<string>, knowledgeCount: number): number {
   if (knowledgeCount === 0) return 0;
-  const cited = new Set(content.citations.filter((c) => validRefs.has(c)));
-  return Math.round((Math.min(cited.size, knowledgeCount) / knowledgeCount) * 100);
+  const cited = citedRefs(content, validRefs).length;
+  return Math.round((Math.min(cited, knowledgeCount) / knowledgeCount) * 100);
 }
 
+/** Normalize the citations array to the refs actually used (array + inline), so it reflects reality. */
 export function sanitizeCitations(content: PlaybookContent, validRefs: Set<string>): PlaybookContent {
-  return { ...content, citations: content.citations.filter((c) => validRefs.has(c)) };
+  return { ...content, citations: citedRefs(content, validRefs) };
 }
 
 export function sourceVersionHash(refs: KnowledgeRef[]): string {
