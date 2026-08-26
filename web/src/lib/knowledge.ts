@@ -92,6 +92,7 @@ export async function getKnowledgeForAI(projectId: string) {
   if (!p) return [];
   const rows = await db
     .select({
+      id: knowledgeItem.id,
       title: knowledgeItem.title,
       source: knowledgeItem.source,
       content: knowledgeItem.content,
@@ -105,10 +106,12 @@ export async function getKnowledgeForAI(projectId: string) {
   return rows
     .filter((r) => r.content && r.content.trim().length > 0)
     .map((r) => ({
+      id: r.id,
       title: r.title,
       source: r.source,
       content: r.content as string,
       scope: r.projectId == null ? "organization" : r.projectId === projectId ? "this-project" : "other-project",
+      updatedAtISO: new Date(r.createdAt).toISOString(),
     }));
 }
 

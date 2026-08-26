@@ -5,6 +5,21 @@ All notable changes to Aurume are documented here. The format follows
 [Semantic Versioning](https://semver.org/). This is early development — APIs,
 schema, and behavior can change between pre-releases.
 
+## [Unreleased]
+
+### Added
+- **Playbook drafter (v1)** — grounded, structured product-playbook generation, the
+  first AI feature. Each project has **Features**; a feature generates a structured
+  playbook (summary + 8 fixed sections) grounded in `getKnowledgeForAI` (org +
+  project knowledge), with **per-section citations** and an informational
+  **groundedness score**. Agents propose, humans commit: the draft is reviewed,
+  edited, and **approved** (locking a version) — never auto-committed. Lineage is
+  recorded (`sourceVersion` hash + the exact knowledge items used); every
+  generation logs telemetry (provider, model, tokens, est. cost, groundedness,
+  outcome). Provider-agnostic behind one `generateStructured` — **Anthropic**
+  (default, `claude-opus-5`), **OpenAI**, and **Ollama** — BYO key via the
+  encrypted connector or env. New tables: `feature`, `playbook`, `ai_generation`.
+
 ## [0.1.0] — 2026-08-25
 
 The first cut of the **Aurume platform shell**: the identity, project, and

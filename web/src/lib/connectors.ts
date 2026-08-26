@@ -52,7 +52,27 @@ export const CONNECTOR_PROVIDERS: ConnectorProvider[] = [
       { key: "clientSecret", label: "Client secret", type: "password", secret: true, placeholder: "client secret value" },
     ],
   },
-  { id: "anthropic", name: "Anthropic", description: "LLM provider for AI generation.", available: false, fields: [] },
+  {
+    id: "anthropic",
+    name: "Anthropic",
+    description: "Claude — the default LLM for playbook and artifact generation.",
+    available: true,
+    fields: [{ key: "apiKey", label: "API key", type: "password", secret: true, placeholder: "sk-ant-..." }],
+  },
+  {
+    id: "openai",
+    name: "OpenAI",
+    description: "Alternative LLM provider (set AURUME_LLM_PROVIDER=openai to use).",
+    available: true,
+    fields: [{ key: "apiKey", label: "API key", type: "password", secret: true, placeholder: "sk-..." }],
+  },
+  {
+    id: "ollama",
+    name: "Ollama",
+    description: "Local, self-hosted models (set AURUME_LLM_PROVIDER=ollama). No key needed.",
+    available: true,
+    fields: [{ key: "baseUrl", label: "Base URL", type: "text", secret: false, placeholder: "http://localhost:11434" }],
+  },
   { id: "jira", name: "Jira", description: "Sync stories to your Jira board.", available: false, fields: [] },
 ];
 

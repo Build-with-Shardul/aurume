@@ -296,3 +296,85 @@ export const knowledgeItem = pgTable(
     index("knowledge_item_org_idx").on(t.organizationId),
   ],
 );
+
+// A Feature is the unit a playbook is generated for — the head of the
+// Feature → Playbook → Stories → Tests delivery chain.
+export const feature = pgTable(
+  "feature",
+  {
+    id: text("id").primaryKey(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    projectId: text("project_id")
+      .notNull()
+      .references(() => project.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    brief: text("brief"), // one-line problem/initiative statement
+    createdBy: text("created_by").references(() => user.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (t) => [index("feature_project_idx").on(t.projectId)],
+);
+
+// A Playbook is a versioned, structured artifact generated (and then human-edited /
+// approved) for a Feature. `content` is the structured playbook JSON; lineage is
+// captured by `sourceVersion` (a hash of the knowledge snapshot it was grounded in)
+// and `sourceKnowledge` (the exact item ids + updatedAt used). Agents propose; the
+// version is only locked when a human approves.
+export const playbook = pgTable(
+  "playbook",
+  {
+    id: text("id").primaryKey(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    featureId: text("feature_id")
+      .notNull()
+      .references(() => feature.id, { onDelete: "cascade" }),
+    version: integer("version").notNull().default(1),
+    status: text("status").notNull().default("draft"), // draft | approved
+    content: jsonb("content").notNull(), // structured playbook (see lib/ai/playbook.ts)
+    groundedness: integer("groundedness"), // 0–100, informational
+    edited: boolean("edited").notNull().default(false), // human changed the draft before approval
+    provider: text("provider"),
+    model: text("model"),
+    sourceVersion: text("source_version"), // hash of the knowledge snapshot used
+    sourceKnowledge: jsonb("source_knowledge"), // [{id, updatedAt}] lineage
+    createdBy: text("created_by").references(() => user.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+    approvedBy: text("approved_by").references(() => user.id, { onDelete: "set null" }),
+    approvedAt: timestamp("approved_at"),
+  },
+  (t) => [index("playbook_feature_idx").on(t.featureId)],
+);
+
+// Telemetry for every AI generation — the "metrics over autonomy" thesis. Records
+// cost/tokens/latency/model + groundedness at generation, and the human outcome
+// (approved / edited / rejected) once the draft is acted on.
+export const aiGeneration = pgTable(
+  "ai_generation",
+  {
+    id: text("id").primaryKey(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    projectId: text("project_id"),
+    featureId: text("feature_id"),
+    playbookId: text("playbook_id"),
+    kind: text("kind").notNull().default("playbook"),
+    provider: text("provider"),
+    model: text("model"),
+    promptTokens: integer("prompt_tokens"),
+    completionTokens: integer("completion_tokens"),
+    costUsdMicros: integer("cost_usd_micros"), // estimated cost in millionths of USD
+    latencyMs: integer("latency_ms"),
+    groundedness: integer("groundedness"),
+    outcome: text("outcome").notNull().default("generated"), // generated | approved | edited | rejected
+    createdBy: text("created_by").references(() => user.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => [index("ai_generation_org_idx").on(t.organizationId)],
+);

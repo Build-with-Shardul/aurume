@@ -3,7 +3,7 @@ import Link from "next/link";
 import { eq } from "drizzle-orm";
 import { getActiveMembership, canManageOrg } from "@/lib/auth-server";
 import { db } from "@/lib/db";
-import { project, projectMember, knowledgeItem } from "@/lib/db/schema";
+import { project, projectMember, knowledgeItem, feature } from "@/lib/db/schema";
 import { formatBudget } from "@/lib/currencies";
 import { isoToMmddyyyy, isProjectStarted } from "@/lib/dates";
 
@@ -20,6 +20,9 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
   ).length;
   const knowledgeCount = (
     await db.select({ id: knowledgeItem.id }).from(knowledgeItem).where(eq(knowledgeItem.projectId, id))
+  ).length;
+  const featureCount = (
+    await db.select({ id: feature.id }).from(feature).where(eq(feature.projectId, id))
   ).length;
 
   const canManage = canManageOrg(m.role) || p.createdBy === m.userId;
@@ -63,8 +66,24 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
         </div>
 
         <Link
-          href={`/projects/${id}/knowledge`}
+          href={`/projects/${id}/features`}
           className="mt-6 flex items-center justify-between rounded-xl border border-neutral-200 bg-white p-5 hover:border-neutral-400"
+        >
+          <div>
+            <div className="font-medium">🧭 Features & playbooks</div>
+            <p className="mt-1 text-sm text-neutral-500">
+              Draft a grounded, structured product playbook for each feature — the head of the delivery chain.
+            </p>
+          </div>
+          <div className="shrink-0 text-right">
+            <div className="text-lg font-semibold">{featureCount}</div>
+            <div className="text-xs text-neutral-400">feature{featureCount === 1 ? "" : "s"}</div>
+          </div>
+        </Link>
+
+        <Link
+          href={`/projects/${id}/knowledge`}
+          className="mt-4 flex items-center justify-between rounded-xl border border-neutral-200 bg-white p-5 hover:border-neutral-400"
         >
           <div>
             <div className="font-medium">📚 Knowledge space</div>
