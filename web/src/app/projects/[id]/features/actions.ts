@@ -1,14 +1,13 @@
 "use server";
 
-import { and, eq } from "drizzle-orm";
-import { getActiveMembership, canCreateProject } from "@/lib/auth-server";
+import { and, desc, eq } from "drizzle-orm";
+import { getActiveMembership, canCreateProject, canManageOrg } from "@/lib/auth-server";
 import { db } from "@/lib/db";
-import { feature, playbook, aiGeneration, project } from "@/lib/db/schema";
-import { generatePlaybookDraft } from "@/lib/ai/generate";
+import { feature, playbook, aiGeneration, project, member } from "@/lib/db/schema";
+import { generateProductPlaybookDraft } from "@/lib/ai/generate";
 import { LLMConfigError } from "@/lib/ai/provider";
 import { PlaybookContentSchema } from "@/lib/ai/playbook";
 
-/** Load a project the caller may work in, plus whether they can create/generate. */
 async function loadProjectCtx(projectId: string) {
   const m = await getActiveMembership();
   if (!m?.orgId) return null;
@@ -18,14 +17,17 @@ async function loadProjectCtx(projectId: string) {
   return { m, project: p, canWork };
 }
 
-async function loadFeatureCtx(featureId: string) {
-  const m = await getActiveMembership();
-  if (!m?.orgId) return null;
-  const f = (await db.select().from(feature).where(eq(feature.id, featureId)).limit(1))[0];
-  if (!f || f.organizationId !== m.orgId) return null;
-  const p = (await db.select().from(project).where(eq(project.id, f.projectId)).limit(1))[0];
-  const canWork = canCreateProject(m.role) || p?.createdBy === m.userId;
-  return { m, feature: f, project: p, canWork };
+/** The project's single (latest-version) product playbook, if any. */
+async function latestPlaybook(projectId: string) {
+  return (
+    (await db.select().from(playbook).where(eq(playbook.projectId, projectId)).orderBy(desc(playbook.version)).limit(1))[0] ??
+    null
+  );
+}
+
+/** Features changed → the product playbook no longer reflects the project. */
+async function markPlaybookStale(projectId: string) {
+  await db.update(playbook).set({ stale: true }).where(eq(playbook.projectId, projectId));
 }
 
 export async function createFeature(projectId: string, title: string, brief: string) {
@@ -34,59 +36,92 @@ export async function createFeature(projectId: string, title: string, brief: str
   if (!ctx.canWork) return { error: "You don't have permission to add features." };
   const t = title?.trim();
   if (!t) return { error: "A title is required." };
-  const id = crypto.randomUUID();
   await db.insert(feature).values({
-    id,
+    id: crypto.randomUUID(),
     organizationId: ctx.m.orgId!,
     projectId,
     title: t,
     brief: brief?.trim() || null,
     createdBy: ctx.m.userId,
   });
-  return { ok: true, id };
+  await markPlaybookStale(projectId);
+  return { ok: true };
 }
 
-export async function generatePlaybook(featureId: string) {
-  const ctx = await loadFeatureCtx(featureId);
-  if (!ctx?.project) return { error: "Not allowed." };
-  if (!ctx.canWork) return { error: "You don't have permission to generate playbooks." };
+export async function updateFeature(featureId: string, title: string, brief: string) {
+  const m = await getActiveMembership();
+  if (!m?.orgId) return { error: "Not allowed." };
+  const f = (await db.select().from(feature).where(eq(feature.id, featureId)).limit(1))[0];
+  if (!f || f.organizationId !== m.orgId) return { error: "Not found." };
+  const ctx = await loadProjectCtx(f.projectId);
+  if (!ctx?.canWork) return { error: "You don't have permission to edit features." };
+  const t = title?.trim();
+  if (!t) return { error: "A title is required." };
+  await db.update(feature).set({ title: t, brief: brief?.trim() || null, updatedAt: new Date() }).where(eq(feature.id, featureId));
+  await markPlaybookStale(f.projectId);
+  return { ok: true };
+}
+
+export async function deleteFeature(featureId: string) {
+  const m = await getActiveMembership();
+  if (!m?.orgId) return { error: "Not allowed." };
+  const f = (await db.select().from(feature).where(eq(feature.id, featureId)).limit(1))[0];
+  if (!f || f.organizationId !== m.orgId) return { error: "Not found." };
+  const ctx = await loadProjectCtx(f.projectId);
+  if (!ctx?.canWork) return { error: "You don't have permission to remove features." };
+  await db.delete(feature).where(eq(feature.id, featureId));
+  await markPlaybookStale(f.projectId);
+  return { ok: true };
+}
+
+export async function generateProductPlaybook(projectId: string) {
+  const ctx = await loadProjectCtx(projectId);
+  if (!ctx) return { error: "Not allowed." };
+  if (!ctx.canWork) return { error: "You don't have permission to generate the playbook." };
+
+  const features = await db
+    .select({ title: feature.title, brief: feature.brief })
+    .from(feature)
+    .where(eq(feature.projectId, projectId))
+    .orderBy(feature.createdAt);
 
   let draft;
   try {
-    draft = await generatePlaybookDraft({
+    draft = await generateProductPlaybookDraft({
       orgId: ctx.m.orgId!,
-      projectId: ctx.feature.projectId,
-      feature: { title: ctx.feature.title, brief: ctx.feature.brief },
+      projectId,
+      project: { name: ctx.project.name, description: ctx.project.description },
+      features,
     });
   } catch (e) {
     if (e instanceof LLMConfigError) return { error: e.message };
     return { error: e instanceof Error ? `Generation failed: ${e.message}` : "Generation failed." };
   }
 
-  const existing = await db.select({ v: playbook.version }).from(playbook).where(eq(playbook.featureId, featureId));
-  const version = existing.length + 1;
-
+  const prev = await latestPlaybook(projectId);
+  const version = (prev?.version ?? 0) + 1;
   const playbookId = crypto.randomUUID();
   await db.insert(playbook).values({
     id: playbookId,
     organizationId: ctx.m.orgId!,
-    featureId,
+    projectId,
     version,
     status: "draft",
+    stale: false,
     content: draft.content,
     groundedness: draft.groundedness,
     provider: draft.provider,
     model: draft.model,
     sourceVersion: draft.sourceVersion,
     sourceKnowledge: draft.sourceKnowledge,
+    approverId: prev?.approverId ?? null, // carry the assigned approver forward
     createdBy: ctx.m.userId,
   });
 
   await db.insert(aiGeneration).values({
     id: crypto.randomUUID(),
     organizationId: ctx.m.orgId!,
-    projectId: ctx.feature.projectId,
-    featureId,
+    projectId,
     playbookId,
     kind: "playbook",
     provider: draft.provider,
@@ -94,13 +129,12 @@ export async function generatePlaybook(featureId: string) {
     promptTokens: draft.promptTokens,
     completionTokens: draft.completionTokens,
     costUsdMicros: draft.costUsdMicros ?? null,
-    latencyMs: null,
     groundedness: draft.groundedness,
     outcome: "generated",
     createdBy: ctx.m.userId,
   });
 
-  return { ok: true, playbookId, version, groundedness: draft.groundedness, knowledgeCount: draft.knowledgeCount };
+  return { ok: true, playbookId, version, groundedness: draft.groundedness };
 }
 
 async function loadPlaybookCtx(playbookId: string) {
@@ -108,8 +142,7 @@ async function loadPlaybookCtx(playbookId: string) {
   if (!m?.orgId) return null;
   const pb = (await db.select().from(playbook).where(eq(playbook.id, playbookId)).limit(1))[0];
   if (!pb || pb.organizationId !== m.orgId) return null;
-  const f = (await db.select().from(feature).where(eq(feature.id, pb.featureId)).limit(1))[0];
-  const p = f ? (await db.select().from(project).where(eq(project.id, f.projectId)).limit(1))[0] : undefined;
+  const p = (await db.select().from(project).where(eq(project.id, pb.projectId)).limit(1))[0];
   const canWork = canCreateProject(m.role) || p?.createdBy === m.userId;
   return { m, playbook: pb, canWork };
 }
@@ -121,25 +154,33 @@ export async function savePlaybookContent(playbookId: string, content: unknown) 
   if (ctx.playbook.status === "approved") return { error: "This playbook is approved and locked." };
   const parsed = PlaybookContentSchema.safeParse(content);
   if (!parsed.success) return { error: "Invalid playbook content." };
-  await db
-    .update(playbook)
-    .set({ content: parsed.data, edited: true, updatedAt: new Date() })
-    .where(eq(playbook.id, playbookId));
+  await db.update(playbook).set({ content: parsed.data, edited: true, updatedAt: new Date() }).where(eq(playbook.id, playbookId));
+  return { ok: true };
+}
+
+export async function setPlaybookApprover(playbookId: string, approverId: string | null) {
+  const ctx = await loadPlaybookCtx(playbookId);
+  if (!ctx) return { error: "Not allowed." };
+  if (!ctx.canWork) return { error: "You don't have permission to set the approver." };
+  if (approverId) {
+    // approver must be a member of the org
+    const isMember = (await db.select({ id: member.id }).from(member).where(and(eq(member.organizationId, ctx.m.orgId!), eq(member.userId, approverId))).limit(1))[0];
+    if (!isMember) return { error: "That person isn't in this workspace." };
+  }
+  await db.update(playbook).set({ approverId, updatedAt: new Date() }).where(eq(playbook.id, playbookId));
   return { ok: true };
 }
 
 export async function approvePlaybook(playbookId: string) {
   const ctx = await loadPlaybookCtx(playbookId);
   if (!ctx) return { error: "Not allowed." };
-  if (!ctx.canWork) return { error: "You don't have permission to approve." };
-  await db
-    .update(playbook)
-    .set({ status: "approved", approvedBy: ctx.m.userId, approvedAt: new Date(), updatedAt: new Date() })
-    .where(eq(playbook.id, playbookId));
-  // Record the human outcome for the acceptance metric.
-  await db
-    .update(aiGeneration)
-    .set({ outcome: ctx.playbook.edited ? "edited" : "approved" })
-    .where(and(eq(aiGeneration.playbookId, playbookId), eq(aiGeneration.outcome, "generated")));
+  const pb = ctx.playbook;
+  // The assigned approver approves; org owners/admins can always approve.
+  const isApprover = pb.approverId ? pb.approverId === ctx.m.userId : ctx.canWork;
+  if (!isApprover && !canManageOrg(ctx.m.role)) {
+    return { error: "Only the assigned approver can approve this playbook." };
+  }
+  await db.update(playbook).set({ status: "approved", stale: false, approvedBy: ctx.m.userId, approvedAt: new Date(), updatedAt: new Date() }).where(eq(playbook.id, playbookId));
+  await db.update(aiGeneration).set({ outcome: pb.edited ? "edited" : "approved" }).where(and(eq(aiGeneration.playbookId, playbookId), eq(aiGeneration.outcome, "generated")));
   return { ok: true };
 }

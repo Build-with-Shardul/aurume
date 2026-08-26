@@ -60,25 +60,33 @@ export function buildKnowledgeContext(
 }
 
 export const PLAYBOOK_SYSTEM = [
-  "You are a senior product manager drafting a structured product playbook.",
+  "You are a senior product manager drafting the single product playbook for a project.",
+  "The playbook covers the whole product across its listed FEATURES — synthesize them into one coherent product view, not a per-feature list.",
   "Ground every claim in the provided KNOWLEDGE. When a section draws on knowledge, cite the refs (e.g. K1, K3) in that section's citations.",
   "If the knowledge does not support a section, write your best professional inference but leave citations empty — never invent a ref that isn't in KNOWLEDGE.",
   "Be concrete and concise. This is a draft a human will review and approve.",
 ].join(" ");
 
 export function buildPlaybookPrompt(
-  feature: { title: string; brief: string | null },
+  project: { name: string; description: string | null },
+  features: Array<{ title: string; brief: string | null }>,
   contextText: string,
 ): string {
   const sectionSpec = SECTIONS.map((s) => `- ${s.key} (${s.heading}): ${s.guide}`).join("\n");
+  const featureList = features.length
+    ? features.map((f, i) => `${i + 1}. ${f.title}${f.brief ? ` — ${f.brief}` : ""}`).join("\n")
+    : "(no features yet — draft a product-level playbook from the project and knowledge, and note low confidence)";
   return [
-    `FEATURE: ${feature.title}`,
-    feature.brief ? `BRIEF: ${feature.brief}` : "",
+    `PRODUCT / PROJECT: ${project.name}`,
+    project.description ? `DESCRIPTION: ${project.description}` : "",
+    "",
+    "FEATURES this product includes:",
+    featureList,
     "",
     "KNOWLEDGE (cite by ref):",
-    contextText.trim() || "(no knowledge provided — rely on the feature brief and note low confidence)",
+    contextText.trim() || "(no knowledge provided — rely on the project and features, and note low confidence)",
     "",
-    "Produce a playbook with a one-paragraph summary and exactly these sections, in order:",
+    "Produce ONE product playbook with a one-paragraph summary and exactly these sections, in order:",
     sectionSpec,
     "",
     "Each section: a `key` from the list above, its `heading`, `content` in markdown, and `citations` (the refs it used).",

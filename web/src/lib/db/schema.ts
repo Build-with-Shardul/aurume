@@ -319,10 +319,12 @@ export const feature = pgTable(
 );
 
 // A Playbook is a versioned, structured artifact generated (and then human-edited /
-// approved) for a Feature. `content` is the structured playbook JSON; lineage is
-// captured by `sourceVersion` (a hash of the knowledge snapshot it was grounded in)
-// and `sourceKnowledge` (the exact item ids + updatedAt used). Agents propose; the
-// version is only locked when a human approves.
+// A project has ONE product playbook — a versioned, structured artifact synthesized
+// from all of the project's Features plus its knowledge. `content` is the structured
+// JSON; lineage is captured by `sourceVersion` (a hash of the knowledge+feature
+// snapshot) and `sourceKnowledge`. `stale` flags that features/knowledge changed
+// since this version was generated. Agents propose; a version is locked only when the
+// assigned approver approves.
 export const playbook = pgTable(
   "playbook",
   {
@@ -330,25 +332,27 @@ export const playbook = pgTable(
     organizationId: text("organization_id")
       .notNull()
       .references(() => organization.id, { onDelete: "cascade" }),
-    featureId: text("feature_id")
+    projectId: text("project_id")
       .notNull()
-      .references(() => feature.id, { onDelete: "cascade" }),
+      .references(() => project.id, { onDelete: "cascade" }),
     version: integer("version").notNull().default(1),
     status: text("status").notNull().default("draft"), // draft | approved
-    content: jsonb("content").notNull(), // structured playbook (see lib/ai/playbook.ts)
+    stale: boolean("stale").notNull().default(false), // features/knowledge changed since generation
+    content: jsonb("content").notNull(),
     groundedness: integer("groundedness"), // 0–100, informational
-    edited: boolean("edited").notNull().default(false), // human changed the draft before approval
+    edited: boolean("edited").notNull().default(false),
     provider: text("provider"),
     model: text("model"),
-    sourceVersion: text("source_version"), // hash of the knowledge snapshot used
-    sourceKnowledge: jsonb("source_knowledge"), // [{id, updatedAt}] lineage
+    sourceVersion: text("source_version"),
+    sourceKnowledge: jsonb("source_knowledge"),
+    approverId: text("approver_id").references(() => user.id, { onDelete: "set null" }), // who should approve
     createdBy: text("created_by").references(() => user.id, { onDelete: "set null" }),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
     approvedBy: text("approved_by").references(() => user.id, { onDelete: "set null" }),
     approvedAt: timestamp("approved_at"),
   },
-  (t) => [index("playbook_feature_idx").on(t.featureId)],
+  (t) => [index("playbook_project_idx").on(t.projectId)],
 );
 
 // Telemetry for every AI generation — the "metrics over autonomy" thesis. Records

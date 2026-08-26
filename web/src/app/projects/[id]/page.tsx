@@ -66,34 +66,34 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
         </div>
 
         <Link
-          href={`/projects/${id}/features`}
-          className="mt-6 flex items-center justify-between rounded-xl border border-neutral-200 bg-white p-5 hover:border-neutral-400"
-        >
-          <div>
-            <div className="font-medium">🧭 Features & playbooks</div>
-            <p className="mt-1 text-sm text-neutral-500">
-              Draft a grounded, structured product playbook for each feature — the head of the delivery chain.
-            </p>
-          </div>
-          <div className="shrink-0 text-right">
-            <div className="text-lg font-semibold">{featureCount}</div>
-            <div className="text-xs text-neutral-400">feature{featureCount === 1 ? "" : "s"}</div>
-          </div>
-        </Link>
-
-        <Link
           href={`/projects/${id}/knowledge`}
-          className="mt-4 flex items-center justify-between rounded-xl border border-neutral-200 bg-white p-5 hover:border-neutral-400"
+          className="mt-6 flex items-center justify-between rounded-xl border border-neutral-200 bg-white p-5 hover:border-neutral-400"
         >
           <div>
             <div className="font-medium">📚 Knowledge space</div>
             <p className="mt-1 text-sm text-neutral-500">
-              Upload docs, spreadsheets, PDFs, images — anything. Aurume references it when drafting playbooks.
+              Upload docs, spreadsheets, PDFs, images — anything. Aurume references it when drafting the playbook.
             </p>
           </div>
           <div className="shrink-0 text-right">
             <div className="text-lg font-semibold">{knowledgeCount}</div>
             <div className="text-xs text-neutral-400">item{knowledgeCount === 1 ? "" : "s"}</div>
+          </div>
+        </Link>
+
+        <Link
+          href={`/projects/${id}/features`}
+          className="mt-4 flex items-center justify-between rounded-xl border border-neutral-200 bg-white p-5 hover:border-neutral-400"
+        >
+          <div>
+            <div className="font-medium">🧭 Features & product playbook</div>
+            <p className="mt-1 text-sm text-neutral-500">
+              Add the product&apos;s features; Aurume synthesizes them into one grounded product playbook to review and approve.
+            </p>
+          </div>
+          <div className="shrink-0 text-right">
+            <div className="text-lg font-semibold">{featureCount}</div>
+            <div className="text-xs text-neutral-400">feature{featureCount === 1 ? "" : "s"}</div>
           </div>
         </Link>
       </div>

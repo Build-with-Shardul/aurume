@@ -25,17 +25,18 @@ export type PlaybookDraft = {
   truncated: number;
 };
 
-/** Generate a grounded, structured playbook draft for a feature. Pure — the caller persists it. */
-export async function generatePlaybookDraft(params: {
+/** Generate the grounded, structured PRODUCT playbook for a project. Pure — the caller persists it. */
+export async function generateProductPlaybookDraft(params: {
   orgId: string;
   projectId: string;
-  feature: { title: string; brief: string | null };
+  project: { name: string; description: string | null };
+  features: Array<{ title: string; brief: string | null }>;
 }): Promise<PlaybookDraft> {
   const knowledge = await getKnowledgeForAI(params.projectId);
   const { contextText, refs } = buildKnowledgeContext(knowledge);
   const validRefs = new Set(refs.map((r) => r.ref));
 
-  const prompt = buildPlaybookPrompt(params.feature, contextText);
+  const prompt = buildPlaybookPrompt(params.project, params.features, contextText);
   const res = await generateStructured({
     orgId: params.orgId,
     system: PLAYBOOK_SYSTEM,
