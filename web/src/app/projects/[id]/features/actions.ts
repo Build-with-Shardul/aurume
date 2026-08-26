@@ -3,7 +3,7 @@
 import { and, desc, eq } from "drizzle-orm";
 import { getActiveMembership, canCreateProject, canManageOrg } from "@/lib/auth-server";
 import { db } from "@/lib/db";
-import { feature, playbook, aiGeneration, project, member } from "@/lib/db/schema";
+import { feature, playbook, aiGeneration, project, member, user } from "@/lib/db/schema";
 import { generateProductPlaybookDraft } from "@/lib/ai/generate";
 import { LLMConfigError } from "@/lib/ai/provider";
 import { PlaybookContentSchema } from "@/lib/ai/playbook";
@@ -85,6 +85,12 @@ export async function generateProductPlaybook(projectId: string) {
     .where(eq(feature.projectId, projectId))
     .orderBy(feature.createdAt);
 
+  const members = await db
+    .select({ name: user.name, email: user.email, discipline: member.discipline })
+    .from(member)
+    .innerJoin(user, eq(user.id, member.userId))
+    .where(eq(member.organizationId, ctx.m.orgId!));
+
   let draft;
   try {
     draft = await generateProductPlaybookDraft({
@@ -92,6 +98,7 @@ export async function generateProductPlaybook(projectId: string) {
       projectId,
       project: { name: ctx.project.name, description: ctx.project.description },
       features,
+      members: members.map((mem) => ({ name: mem.name || mem.email, discipline: mem.discipline })),
     });
   } catch (e) {
     if (e instanceof LLMConfigError) return { error: e.message };

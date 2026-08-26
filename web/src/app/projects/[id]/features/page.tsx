@@ -23,7 +23,7 @@ export default async function FeaturesPage({ params }: { params: Promise<{ id: s
   const pb = (await db.select().from(playbook).where(eq(playbook.projectId, id)).orderBy(desc(playbook.version)).limit(1))[0] ?? null;
 
   const members = await db
-    .select({ userId: member.userId, name: user.name, email: user.email })
+    .select({ userId: member.userId, name: user.name, email: user.email, discipline: member.discipline })
     .from(member)
     .innerJoin(user, eq(user.id, member.userId))
     .where(eq(member.organizationId, m.orgId!));

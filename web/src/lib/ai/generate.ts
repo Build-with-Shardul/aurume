@@ -22,7 +22,6 @@ export type PlaybookDraft = {
   sourceVersion: string;
   sourceKnowledge: Array<{ id: string; updatedAt: string }>;
   knowledgeCount: number;
-  truncated: number;
 };
 
 /** Generate the grounded, structured PRODUCT playbook for a project. Pure — the caller persists it. */
@@ -31,12 +30,13 @@ export async function generateProductPlaybookDraft(params: {
   projectId: string;
   project: { name: string; description: string | null };
   features: Array<{ title: string; brief: string | null }>;
+  members: Array<{ name: string; discipline: string | null }>;
 }): Promise<PlaybookDraft> {
   const knowledge = await getKnowledgeForAI(params.projectId);
   const { contextText, refs } = buildKnowledgeContext(knowledge);
   const validRefs = new Set(refs.map((r) => r.ref));
 
-  const prompt = buildPlaybookPrompt(params.project, params.features, contextText);
+  const prompt = buildPlaybookPrompt(params.project, params.features, params.members, contextText);
   const res = await generateStructured({
     orgId: params.orgId,
     system: PLAYBOOK_SYSTEM,
@@ -46,7 +46,7 @@ export async function generateProductPlaybookDraft(params: {
   });
 
   const content = sanitizeCitations(res.data, validRefs);
-  const groundedness = scoreGroundedness(content, validRefs);
+  const groundedness = scoreGroundedness(content, validRefs, refs.length);
 
   return {
     content,
@@ -59,6 +59,5 @@ export async function generateProductPlaybookDraft(params: {
     sourceVersion: sourceVersionHash(refs),
     sourceKnowledge: refs.map((r) => ({ id: r.id, updatedAt: r.updatedAtISO })),
     knowledgeCount: refs.length,
-    truncated: knowledge.length - refs.length,
   };
 }

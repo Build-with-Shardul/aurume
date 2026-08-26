@@ -11,14 +11,16 @@ schema, and behavior can change between pre-releases.
 - **Playbook drafter (v1)** — grounded, structured product-playbook generation, the
   first AI feature. A project has many **Features** but **one product playbook**,
   synthesized from all its features plus `getKnowledgeForAI` (org + project
-  knowledge), with **per-section citations** and an informational **groundedness
-  score**. Two-column workspace: features on the left (add/edit/remove), the product
-  playbook preview on the right. Changing a feature marks the playbook **out of date**
-  until you update it. You assign an **approver**; agents propose, humans commit — the
-  assigned approver reviews, edits, and **approves** (locking a version), never
-  auto-committed. Lineage is recorded (`sourceVersion` hash + the exact knowledge
-  used); every generation logs telemetry (provider, model, tokens, est. cost,
-  groundedness, outcome). Provider-agnostic behind one `generateStructured` —
+  knowledge). Rich structure: Summary & Key Hypothesis, Test/Scale classification,
+  Key technology & business stakeholder tables (selected from project members),
+  Project milestones, In-scope epics (with Jira links), Adoption markets, Future
+  scope, KPIs & measurement strategy, and Operational & change management —
+  AI-generated and fully editable, with an informational **groundedness score**.
+  Two-column workspace: features on the left (add/edit/remove), the product playbook
+  on the right; changing a feature marks the playbook **out of date** until you update
+  it. You assign an **approver**; agents propose, humans commit — the assigned
+  approver reviews, edits, and **approves** (locking a version). Lineage + telemetry
+  recorded per generation. Provider-agnostic behind one `generateStructured` —
   **Anthropic** (default, `claude-opus-5`), **OpenAI**, **Ollama** — BYO key via the
   encrypted connector or env. New tables: `feature`, `playbook`, `ai_generation`.
 
