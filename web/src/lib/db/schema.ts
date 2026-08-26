@@ -318,6 +318,26 @@ export const feature = pgTable(
   (t) => [index("feature_project_idx").on(t.projectId)],
 );
 
+// Compliance frameworks a project must follow (checkbox selection). Selected items
+// are fed into playbook generation so the output reflects those obligations.
+export const projectCompliance = pgTable(
+  "project_compliance",
+  {
+    id: text("id").primaryKey(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    projectId: text("project_id")
+      .notNull()
+      .references(() => project.id, { onDelete: "cascade" }),
+    key: text("key").notNull(), // framework slug, or a slugified custom label
+    label: text("label").notNull(),
+    createdBy: text("created_by").references(() => user.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => [uniqueIndex("project_compliance_uidx").on(t.projectId, t.key)],
+);
+
 // A Playbook is a versioned, structured artifact generated (and then human-edited /
 // A project has ONE product playbook — a versioned, structured artifact synthesized
 // from all of the project's Features plus its knowledge. `content` is the structured

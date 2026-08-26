@@ -3,7 +3,7 @@ import Link from "next/link";
 import { desc, eq } from "drizzle-orm";
 import { getActiveMembership, canCreateProject, canManageOrg } from "@/lib/auth-server";
 import { db } from "@/lib/db";
-import { project, feature, playbook, member, user } from "@/lib/db/schema";
+import { project, feature, playbook, member, user, projectCompliance } from "@/lib/db/schema";
 import PlaybookWorkspace, { type PlaybookView } from "./workspace-client";
 
 export default async function FeaturesPage({ params }: { params: Promise<{ id: string }> }) {
@@ -21,6 +21,11 @@ export default async function FeaturesPage({ params }: { params: Promise<{ id: s
     .orderBy(feature.createdAt);
 
   const pb = (await db.select().from(playbook).where(eq(playbook.projectId, id)).orderBy(desc(playbook.version)).limit(1))[0] ?? null;
+
+  const compliances = await db
+    .select({ key: projectCompliance.key, label: projectCompliance.label })
+    .from(projectCompliance)
+    .where(eq(projectCompliance.projectId, id));
 
   const members = await db
     .select({ userId: member.userId, name: user.name, email: user.email, discipline: member.discipline })
@@ -70,6 +75,7 @@ export default async function FeaturesPage({ params }: { params: Promise<{ id: s
             features={features}
             playbook={playbookView}
             members={members}
+            compliances={compliances}
             canWork={canWork}
           />
         </div>

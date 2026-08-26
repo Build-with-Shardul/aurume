@@ -85,6 +85,7 @@ export const PLAYBOOK_SYSTEM = [
   "Propose the technical and business stakeholders by drawing from the TEAM MEMBERS provided (use their names and disciplines); give each a plausible project role. If no members are provided, leave those arrays empty.",
   "For in-scope epics, propose epic names and scope details but leave jiraId and jiraUrl empty — the team fills those in.",
   "Classify projectType as 'test' (a new feature to validate) or 'scale' (an existing feature to scale).",
+  "If COMPLIANCE frameworks are listed, the product MUST follow them: weave the obligations into the summary, key hypothesis, scope, epics, risks, KPIs, and operational/change-management sections (e.g. data handling, consent, accessibility, audit, retention).",
   "Cite the knowledge refs you used in the top-level citations. If knowledge doesn't support the content, write your best professional inference and leave citations empty — never invent a ref.",
   "Be concrete and concise. This is a draft a human will review and approve.",
 ].join(" ");
@@ -93,6 +94,7 @@ export function buildPlaybookPrompt(
   project: { name: string; description: string | null },
   features: Array<{ title: string; brief: string | null }>,
   members: Array<{ name: string; discipline: string | null }>,
+  compliances: string[],
   contextText: string,
 ): string {
   const featureList = features.length
@@ -110,6 +112,8 @@ export function buildPlaybookPrompt(
     "",
     "TEAM MEMBERS (for stakeholder tables):",
     memberList,
+    "",
+    compliances.length ? `COMPLIANCE this product MUST follow: ${compliances.join(", ")}` : "COMPLIANCE: none specified.",
     "",
     "KNOWLEDGE (cite by ref):",
     contextText.trim() || "(no knowledge provided)",

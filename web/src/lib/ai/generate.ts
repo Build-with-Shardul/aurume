@@ -31,12 +31,13 @@ export async function generateProductPlaybookDraft(params: {
   project: { name: string; description: string | null };
   features: Array<{ title: string; brief: string | null }>;
   members: Array<{ name: string; discipline: string | null }>;
+  compliances: string[];
 }): Promise<PlaybookDraft> {
   const knowledge = await getKnowledgeForAI(params.projectId);
   const { contextText, refs } = buildKnowledgeContext(knowledge);
   const validRefs = new Set(refs.map((r) => r.ref));
 
-  const prompt = buildPlaybookPrompt(params.project, params.features, params.members, contextText);
+  const prompt = buildPlaybookPrompt(params.project, params.features, params.members, params.compliances, contextText);
   const res = await generateStructured({
     orgId: params.orgId,
     system: PLAYBOOK_SYSTEM,

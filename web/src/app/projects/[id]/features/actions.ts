@@ -3,7 +3,7 @@
 import { and, desc, eq } from "drizzle-orm";
 import { getActiveMembership, canCreateProject, canManageOrg } from "@/lib/auth-server";
 import { db } from "@/lib/db";
-import { feature, playbook, aiGeneration, project, member, user } from "@/lib/db/schema";
+import { feature, playbook, aiGeneration, project, member, user, projectCompliance } from "@/lib/db/schema";
 import { generateProductPlaybookDraft } from "@/lib/ai/generate";
 import { LLMConfigError } from "@/lib/ai/provider";
 import { PlaybookContentSchema } from "@/lib/ai/playbook";
@@ -44,6 +44,25 @@ export async function createFeature(projectId: string, title: string, brief: str
     brief: brief?.trim() || null,
     createdBy: ctx.m.userId,
   });
+  await markPlaybookStale(projectId);
+  return { ok: true };
+}
+
+export async function setCompliance(projectId: string, key: string, label: string, on: boolean) {
+  const ctx = await loadProjectCtx(projectId);
+  if (!ctx) return { error: "Not allowed." };
+  if (!ctx.canWork) return { error: "You don't have permission to change compliance." };
+  const k = key?.trim();
+  const l = label?.trim();
+  if (!k || !l) return { error: "Invalid compliance." };
+  if (on) {
+    await db
+      .insert(projectCompliance)
+      .values({ id: crypto.randomUUID(), organizationId: ctx.m.orgId!, projectId, key: k, label: l, createdBy: ctx.m.userId })
+      .onConflictDoNothing();
+  } else {
+    await db.delete(projectCompliance).where(and(eq(projectCompliance.projectId, projectId), eq(projectCompliance.key, k)));
+  }
   await markPlaybookStale(projectId);
   return { ok: true };
 }
@@ -91,6 +110,11 @@ export async function generateProductPlaybook(projectId: string) {
     .innerJoin(user, eq(user.id, member.userId))
     .where(eq(member.organizationId, ctx.m.orgId!));
 
+  const compliances = await db
+    .select({ label: projectCompliance.label })
+    .from(projectCompliance)
+    .where(eq(projectCompliance.projectId, projectId));
+
   let draft;
   try {
     draft = await generateProductPlaybookDraft({
@@ -99,6 +123,7 @@ export async function generateProductPlaybook(projectId: string) {
       project: { name: ctx.project.name, description: ctx.project.description },
       features,
       members: members.map((mem) => ({ name: mem.name || mem.email, discipline: mem.discipline })),
+      compliances: compliances.map((c) => c.label),
     });
   } catch (e) {
     if (e instanceof LLMConfigError) return { error: e.message };

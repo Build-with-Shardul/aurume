@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { DISCIPLINE_LABEL } from "@/lib/permissions";
+import { COMPLIANCE_FRAMEWORKS, slugifyCompliance } from "@/lib/compliance";
 import {
   createFeature,
   updateFeature,
@@ -11,6 +12,7 @@ import {
   savePlaybookContent,
   setPlaybookApprover,
   approvePlaybook,
+  setCompliance,
 } from "./actions";
 
 type Feature = { id: string; title: string; brief: string | null };
@@ -62,17 +64,21 @@ function Block({ title, children }: { title: string; children: React.ReactNode }
   );
 }
 
+type Compliance = { key: string; label: string };
+
 export default function PlaybookWorkspace({
   projectId,
   features,
   playbook,
   members,
+  compliances,
   canWork,
 }: {
   projectId: string;
   features: Feature[];
   playbook: PlaybookView | null;
   members: Member[];
+  compliances: Compliance[];
   canWork: boolean;
 }) {
   const router = useRouter();
@@ -86,6 +92,11 @@ export default function PlaybookWorkspace({
   const [eBrief, setEBrief] = useState("");
   const [pbEditing, setPbEditing] = useState(false);
   const [draft, setDraft] = useState<Content | null>(null);
+  const [customCmp, setCustomCmp] = useState("");
+
+  const selectedCmp = new Set(compliances.map((c) => c.key));
+  const predefinedKeys = new Set(COMPLIANCE_FRAMEWORKS.map((f) => f.key));
+  const customCmps = compliances.filter((c) => !predefinedKeys.has(c.key));
 
   async function run(key: string, fn: () => Promise<{ error?: string } | void>, after?: () => void) {
     setErr("");
@@ -156,6 +167,49 @@ export default function PlaybookWorkspace({
             </li>
           ))}
         </ul>
+
+        {/* Compliance */}
+        <div className="mt-8">
+          <h2 className="text-sm font-semibold">Compliance</h2>
+          <p className="mt-0.5 text-xs text-neutral-400">What this project must follow. Selections shape the generated playbook.</p>
+          <ul className="mt-3 space-y-1.5">
+            {COMPLIANCE_FRAMEWORKS.map((f) => {
+              const on = selectedCmp.has(f.key);
+              return (
+                <li key={f.key}>
+                  <label className="flex cursor-pointer items-start gap-2">
+                    <input type="checkbox" checked={on} disabled={!canWork || busy === `cmp-${f.key}`} onChange={(e) => run(`cmp-${f.key}`, () => setCompliance(projectId, f.key, f.label, e.target.checked))} className="mt-0.5 accent-neutral-900" />
+                    <span className="text-sm">
+                      <span className="font-medium">{f.label}</span>
+                      <span className="ml-1 text-xs text-neutral-400">{f.description}</span>
+                    </span>
+                  </label>
+                </li>
+              );
+            })}
+            {customCmps.map((c) => (
+              <li key={c.key}>
+                <label className="flex cursor-pointer items-center gap-2">
+                  <input type="checkbox" checked disabled={!canWork || busy === `cmp-${c.key}`} onChange={() => run(`cmp-${c.key}`, () => setCompliance(projectId, c.key, c.label, false))} className="accent-neutral-900" />
+                  <span className="text-sm font-medium">{c.label}</span>
+                  <span className="text-[11px] text-neutral-400">(custom)</span>
+                </label>
+              </li>
+            ))}
+          </ul>
+          {canWork && (
+            <div className="mt-3 flex gap-2">
+              <input value={customCmp} onChange={(e) => setCustomCmp(e.target.value)} placeholder="Add custom…" className={`${cell} flex-1`} />
+              <button
+                disabled={!customCmp.trim() || busy === "cmp-add"}
+                onClick={() => run("cmp-add", () => setCompliance(projectId, slugifyCompliance(customCmp), customCmp.trim(), true), () => setCustomCmp(""))}
+                className="rounded-md border border-neutral-300 px-2.5 py-1 text-xs hover:bg-neutral-50 disabled:opacity-50"
+              >
+                Add
+              </button>
+            </div>
+          )}
+        </div>
       </aside>
 
       {/* RIGHT: product playbook */}
