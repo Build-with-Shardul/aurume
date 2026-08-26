@@ -49,17 +49,18 @@ A few principles, decided up front (full rationale in
 
 ## Roadmap
 
-Aurume ships as independent, documented repositories first; the platform assembles
-them. Only shipped repos are listed as such — this table is the honest status.
+The platform spine shipped first — workspace, roles, projects, and a knowledge base.
+The AI capabilities land next as independent, documented, benchmarked repos the
+platform assembles. Only shipped work is marked so — this table is the honest status.
 
 | Component | What it does | Status |
 |---|---|---|
-| `playbook-drafter` | Template-driven structured playbook generation | 🚧 In progress |
+| **`aurume`** (this repo) | Multi-org workspace, RBAC, projects, connectors, knowledge space | ✅ Live · [v0.1.0](https://github.com/Build-with-Shardul/aurume/releases/tag/v0.1.0) |
+| `playbook-drafter` | Grounded, structured product-playbook generation | 🔜 Next |
 | `spec-to-stories` | Grounded story generation with citations (RAG) | Planned |
 | `story-to-tests` | Test cases + traceability matrix | Planned |
 | `delivery-evals` | Groundedness / faithfulness evaluation harness | Planned |
 | `delivery-graph` | Workflow orchestration, approval gates, resume | Planned |
-| **`aurume`** (this repo) | The platform shell that assembles the above | Planned |
 | `qa-agent` | Browser agent that authors Playwright tests | Planned |
 | `llm-observability` | Traces, cost, latency, quality over real runs | Planned |
 

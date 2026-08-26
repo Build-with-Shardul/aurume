@@ -79,6 +79,7 @@
   .road-what{color:var(--body);font-size:14px;flex:1}
   .status{flex:none;font-size:11.5px;text-transform:uppercase;letter-spacing:.08em;border:1px solid var(--line);border-radius:999px;padding:3px 10px;color:var(--faint)}
   .status.now{color:var(--ok);border-color:color-mix(in srgb,var(--ok) 45%,var(--line))}
+  .status.next{color:var(--ink);border-color:var(--line-strong)}
   @media(max-width:640px){.road-name{min-width:130px}.road-what{display:none}}
 
   /* footer */
@@ -159,14 +160,16 @@
   <div class="wrap">
     <span class="eyebrow">Roadmap</span>
     <h2>Shipped in the open, one repo at a time.</h2>
-    <p class="sub">The AI capabilities ship as independent, documented, benchmarked repositories first; the platform assembles them. Honest status — only what exists is marked so.</p>
+    <p class="sub">The platform spine shipped first — workspace, roles, projects, and a knowledge base. The AI capabilities land next as independent, documented, benchmarked repos the platform assembles. Honest status — only what exists is marked so.</p>
     <div class="road">
-      <div class="road-row"><span class="road-name">playbook-drafter</span><span class="road-what">Template-driven structured playbook generation</span><span class="status now">In progress</span></div>
+      <div class="road-row"><span class="road-name">aurume</span><span class="road-what">Multi-org workspace, RBAC, projects, connectors, knowledge space</span><span class="status now">Live · v0.1.0</span></div>
+      <div class="road-row"><span class="road-name">playbook-drafter</span><span class="road-what">Grounded, structured product-playbook generation</span><span class="status next">Next</span></div>
       <div class="road-row"><span class="road-name">spec-to-stories</span><span class="road-what">Grounded story generation with citations (RAG)</span><span class="status">Planned</span></div>
       <div class="road-row"><span class="road-name">story-to-tests</span><span class="road-what">Test cases + traceability matrix</span><span class="status">Planned</span></div>
       <div class="road-row"><span class="road-name">delivery-evals</span><span class="road-what">Groundedness / faithfulness evaluation harness</span><span class="status">Planned</span></div>
       <div class="road-row"><span class="road-name">delivery-graph</span><span class="road-what">Workflow orchestration, approval gates, resume</span><span class="status">Planned</span></div>
-      <div class="road-row"><span class="road-name">aurume</span><span class="road-what">The platform shell that assembles the above</span><span class="status">Planned</span></div>
+      <div class="road-row"><span class="road-name">qa-agent</span><span class="road-what">Browser agent that authors Playwright tests</span><span class="status">Planned</span></div>
+      <div class="road-row"><span class="road-name">llm-observability</span><span class="road-what">Traces, cost, latency, quality over real runs</span><span class="status">Planned</span></div>
     </div>
   </div>
 </section>
