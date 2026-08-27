@@ -19,13 +19,14 @@ export default async function EpicsPage({ params }: { params: Promise<{ id: stri
   const epics = await db.select().from(epic).where(eq(epic.projectId, id)).orderBy(asc(epic.orderIndex), asc(epic.createdAt));
   const epicIds = epics.map((e) => e.id);
   const stories = epicIds.length
-    ? await db.select({ epicId: story.epicId, status: story.status }).from(story).where(inArray(story.epicId, epicIds))
+    ? await db.select({ epicId: story.epicId, status: story.status, points: story.points }).from(story).where(inArray(story.epicId, epicIds))
     : [];
-  const counts = new Map<string, { total: number; approved: number }>();
+  const counts = new Map<string, { total: number; approved: number; points: number }>();
   for (const s of stories) {
-    const c = counts.get(s.epicId) ?? { total: 0, approved: 0 };
+    const c = counts.get(s.epicId) ?? { total: 0, approved: 0, points: 0 };
     c.total++;
     if (s.status === "approved") c.approved++;
+    c.points += s.points ?? 0;
     counts.set(s.epicId, c);
   }
 
@@ -34,7 +35,7 @@ export default async function EpicsPage({ params }: { params: Promise<{ id: stri
     name: e.name,
     scopeDetail: e.scopeDetail,
     jiraId: e.jiraId,
-    stories: counts.get(e.id) ?? { total: 0, approved: 0 },
+    stories: counts.get(e.id) ?? { total: 0, approved: 0, points: 0 },
   }));
 
   const canWork = canCreateProject(m.role) || p.createdBy === m.userId;

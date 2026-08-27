@@ -16,9 +16,10 @@ export async function createProject(input: {
   description?: string;
   budget?: number | null;
   currency: string;
+  hoursPerPoint?: number | null;
   startDate?: string | null;
   endDate?: string | null;
-  members: Array<{ userId: string; rate?: number | null; timezone?: string | null }>;
+  members: Array<{ userId: string; rate?: number | null; timezone?: string | null; hoursPerDay?: number | null }>;
 }) {
   const m = await getActiveMembership();
   if (!m?.orgId) return { error: "No workspace found." };
@@ -43,22 +44,23 @@ export async function createProject(input: {
     description: input.description?.trim() || null,
     budget: input.budget,
     currency: input.currency,
+    hoursPerPoint: input.hoursPerPoint && input.hoursPerPoint > 0 ? Math.round(input.hoursPerPoint) : 8,
     startDate: input.startDate,
     endDate: input.endDate,
     createdBy: m.userId,
   });
 
   const valid = await orgMemberIds(m.orgId);
-  const byId = new Map<string, { rate: number | null; timezone: string | null }>();
+  const byId = new Map<string, { rate: number | null; timezone: string | null; hoursPerDay: number }>();
   for (const r of input.members || []) {
-    if (valid.has(r.userId)) byId.set(r.userId, { rate: r.rate ?? null, timezone: r.timezone ?? null });
+    if (valid.has(r.userId)) byId.set(r.userId, { rate: r.rate ?? null, timezone: r.timezone ?? null, hoursPerDay: r.hoursPerDay && r.hoursPerDay > 0 ? Math.round(r.hoursPerDay) : 8 });
   }
   // The creator is always on the project; their rate/timezone can be set afterward.
-  if (!byId.has(m.userId)) byId.set(m.userId, { rate: null, timezone: null });
+  if (!byId.has(m.userId)) byId.set(m.userId, { rate: null, timezone: null, hoursPerDay: 8 });
   for (const [userId, v] of byId) {
     await db
       .insert(projectMember)
-      .values({ id: crypto.randomUUID(), projectId: id, userId, rate: v.rate, timezone: v.timezone })
+      .values({ id: crypto.randomUUID(), projectId: id, userId, rate: v.rate, timezone: v.timezone, hoursPerDay: v.hoursPerDay })
       .onConflictDoNothing();
   }
 
@@ -67,7 +69,7 @@ export async function createProject(input: {
 
 export async function updateProjectSettings(
   projectId: string,
-  input: { budget: number | null; startDate: string | null; endDate: string | null },
+  input: { budget: number | null; startDate: string | null; endDate: string | null; hoursPerPoint?: number | null },
 ) {
   const m = await canManageProject(projectId);
   if (!m) return { error: "Not allowed." };
@@ -76,6 +78,7 @@ export async function updateProjectSettings(
 
   if (input.budget == null || Number.isNaN(input.budget)) return { error: "Budget is required." };
   if (!input.endDate) return { error: "Expected end is required." };
+  const hoursPerPoint = input.hoursPerPoint && input.hoursPerPoint > 0 ? Math.round(input.hoursPerPoint) : p.hoursPerPoint;
 
   const started = isProjectStarted(p.startDate);
   // Once a project has started its start date is locked; otherwise it stays editable.
@@ -85,7 +88,7 @@ export async function updateProjectSettings(
 
   await db
     .update(project)
-    .set({ budget: input.budget, startDate, endDate: input.endDate, updatedAt: new Date() })
+    .set({ budget: input.budget, startDate, endDate: input.endDate, hoursPerPoint, updatedAt: new Date() })
     .where(eq(project.id, projectId));
   return { ok: true };
 }
@@ -122,6 +125,7 @@ export async function addProjectMember(
   userId: string,
   rate: number | null,
   timezone: string | null,
+  hoursPerDay?: number | null,
 ) {
   const m = await canManageProject(projectId);
   if (!m?.orgId) return { error: "Not allowed." };
@@ -131,7 +135,7 @@ export async function addProjectMember(
   if (!valid.has(userId)) return { error: "That person isn't in this workspace." };
   await db
     .insert(projectMember)
-    .values({ id: crypto.randomUUID(), projectId, userId, rate, timezone })
+    .values({ id: crypto.randomUUID(), projectId, userId, rate, timezone, hoursPerDay: hoursPerDay && hoursPerDay > 0 ? Math.round(hoursPerDay) : 8 })
     .onConflictDoNothing();
   return { ok: true };
 }
@@ -150,6 +154,7 @@ export async function updateProjectMember(
   userId: string,
   rate: number | null,
   timezone: string | null,
+  hoursPerDay?: number | null,
 ) {
   const m = await canManageProject(projectId);
   if (!m) return { error: "Not allowed." };
@@ -157,7 +162,7 @@ export async function updateProjectMember(
   if (!timezone) return { error: "A timezone is required." };
   await db
     .update(projectMember)
-    .set({ rate, timezone })
+    .set({ rate, timezone, ...(hoursPerDay && hoursPerDay > 0 ? { hoursPerDay: Math.round(hoursPerDay) } : {}) })
     .where(and(eq(projectMember.projectId, projectId), eq(projectMember.userId, userId)));
   return { ok: true };
 }

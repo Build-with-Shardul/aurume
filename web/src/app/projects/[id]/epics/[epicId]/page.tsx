@@ -3,7 +3,7 @@ import Link from "next/link";
 import { asc, desc, eq } from "drizzle-orm";
 import { getActiveMembership, canCreateProject } from "@/lib/auth-server";
 import { db } from "@/lib/db";
-import { project, playbook, epic, story } from "@/lib/db/schema";
+import { project, playbook, epic, story, projectMember, user } from "@/lib/db/schema";
 import { currentProvider, MODEL_OPTIONS, defaultModel } from "@/lib/ai/provider";
 import EpicDetail, { type StoryView } from "./stories-client";
 
@@ -19,6 +19,12 @@ export default async function EpicPage({ params }: { params: Promise<{ id: strin
 
   const pb = (await db.select({ version: playbook.version, status: playbook.status }).from(playbook).where(eq(playbook.projectId, id)).orderBy(desc(playbook.version)).limit(1))[0] ?? null;
 
+  const members = (await db
+    .select({ userId: projectMember.userId, name: user.name, email: user.email })
+    .from(projectMember)
+    .innerJoin(user, eq(user.id, projectMember.userId))
+    .where(eq(projectMember.projectId, id))).map((mm) => ({ userId: mm.userId, name: mm.name || mm.email }));
+
   const rows = await db.select().from(story).where(eq(story.epicId, epicId)).orderBy(asc(story.createdAt));
   const stories: StoryView[] = rows.map((s) => ({
     id: s.id,
@@ -31,6 +37,9 @@ export default async function EpicPage({ params }: { params: Promise<{ id: strin
     citations: (s.citations as string[]) ?? [],
     sourceApproved: s.sourceApproved,
     sourceVersion: s.sourceVersion,
+    assigneeId: s.assigneeId,
+    startDate: s.startDate,
+    endDate: s.endDate,
   }));
 
   const canWork = canCreateProject(m.role) || p.createdBy === m.userId;
@@ -52,6 +61,7 @@ export default async function EpicPage({ params }: { params: Promise<{ id: strin
             projectId={id}
             epic={{ id: e.id, name: e.name, scopeDetail: e.scopeDetail, jiraId: e.jiraId, jiraUrl: e.jiraUrl }}
             stories={stories}
+            members={members}
             canWork={canWork}
             modelInfo={modelInfo}
             playbookApproved={pb?.status === "approved"}

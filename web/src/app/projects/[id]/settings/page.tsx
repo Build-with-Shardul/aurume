@@ -24,6 +24,7 @@ export default async function ProjectSettingsPage({ params }: { params: Promise<
       email: user.email,
       rate: projectMember.rate,
       timezone: projectMember.timezone,
+      hoursPerDay: projectMember.hoursPerDay,
     })
     .from(projectMember)
     .innerJoin(user, eq(user.id, projectMember.userId))
@@ -67,6 +68,7 @@ export default async function ProjectSettingsPage({ params }: { params: Promise<
             budget={p.budget}
             startDate={p.startDate}
             endDate={p.endDate}
+            hoursPerPoint={p.hoursPerPoint}
             started={started}
             canManage={canManage}
           />

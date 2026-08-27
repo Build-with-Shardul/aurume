@@ -10,7 +10,7 @@ type Item = {
   name: string;
   scopeDetail: string | null;
   jiraId: string | null;
-  stories: { total: number; approved: number };
+  stories: { total: number; approved: number; points: number };
 };
 
 const field = "w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-neutral-900";
@@ -101,7 +101,7 @@ export default function EpicsClient({
                       <span className="text-neutral-400">No stories</span>
                     ) : (
                       <>
-                        <div className="font-medium text-neutral-800">{e.stories.total} stor{e.stories.total === 1 ? "y" : "ies"}</div>
+                        <div className="font-medium text-neutral-800">{e.stories.total} stor{e.stories.total === 1 ? "y" : "ies"} · {e.stories.points} pts</div>
                         <div className="text-neutral-400">{e.stories.approved} approved</div>
                       </>
                     )}

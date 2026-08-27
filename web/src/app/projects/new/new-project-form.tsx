@@ -46,6 +46,7 @@ export default function NewProjectForm({
   const [description, setDescription] = useState("");
   const [budget, setBudget] = useState("");
   const [currency, setCurrency] = useState(currencies[0] ?? "USD");
+  const [hpp, setHpp] = useState("8");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [rows, setRows] = useState<Record<string, Row>>(() =>
@@ -90,6 +91,7 @@ export default function NewProjectForm({
       description,
       budget: Math.round(Number(budget)),
       currency,
+      hoursPerPoint: hpp.trim() ? Math.round(Number(hpp)) : 8,
       startDate: startISO,
       endDate: endISO,
       members,
@@ -125,6 +127,18 @@ export default function NewProjectForm({
               <option key={c} value={c}>{c}</option>
             ))}
           </select>
+        </div>
+      </div>
+
+      <div className="mb-4">
+        <label className={label}>1 story point = hours</label>
+        <div className="flex flex-wrap items-center gap-2">
+          <input type="number" min="1" value={hpp} onChange={(e) => setHpp(e.target.value)} className={`${field} w-28`} />
+          <span className="text-xs text-neutral-400">hours</span>
+          {[1, 2, 3, 8].map((n) => (
+            <button key={n} type="button" onClick={() => setHpp(String(n))} className={`rounded-md border px-2.5 py-1 text-xs ${hpp === String(n) ? "border-neutral-900 bg-neutral-900 text-white" : "border-neutral-300 hover:bg-neutral-50"}`}>{n}h</button>
+          ))}
+          <span className="text-xs text-neutral-400">Used for story hours, cost, and scheduling.</span>
         </div>
       </div>
 

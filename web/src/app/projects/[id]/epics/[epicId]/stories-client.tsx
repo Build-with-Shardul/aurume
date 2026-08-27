@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { updateEpic, deleteEpic, generateStories, updateStory, deleteStory, setStoryApproved } from "../actions";
+import { updateEpic, deleteEpic, generateStories, updateStory, deleteStory, setStoryApproved, assignStory, setStorySchedule } from "../actions";
 
 export type StoryView = {
   id: string;
@@ -15,8 +15,12 @@ export type StoryView = {
   citations: string[];
   sourceApproved: boolean;
   sourceVersion: string | null;
+  assigneeId: string | null;
+  startDate: string | null;
+  endDate: string | null;
 };
 type Epic = { id: string; name: string; scopeDetail: string | null; jiraId: string | null; jiraUrl: string | null };
+type Member = { userId: string; name: string };
 type ModelInfo = { provider: string; options: string[]; defaultModel: string };
 
 const field = "w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-neutral-900";
@@ -32,6 +36,7 @@ export default function EpicDetail({
   projectId,
   epic,
   stories,
+  members,
   canWork,
   modelInfo,
   playbookApproved,
@@ -40,6 +45,7 @@ export default function EpicDetail({
   projectId: string;
   epic: Epic;
   stories: StoryView[];
+  members: Member[];
   canWork: boolean;
   modelInfo: ModelInfo;
   playbookApproved: boolean;
@@ -64,6 +70,8 @@ export default function EpicDetail({
   const [sAC, setSAC] = useState("");
   const [sPri, setSPri] = useState("should");
   const [sPts, setSPts] = useState("");
+  const [sStart, setSStart] = useState("");
+  const [sEnd, setSEnd] = useState("");
 
   async function run(key: string, fn: () => Promise<{ error?: string } | void>, after?: () => void) {
     setErr("");
@@ -82,6 +90,16 @@ export default function EpicDetail({
     setSAC(s.acceptanceCriteria.join("\n"));
     setSPri(s.priority ?? "should");
     setSPts(s.points != null ? String(s.points) : "");
+    setSStart(s.startDate ? s.startDate.slice(0, 10) : "");
+    setSEnd(s.endDate ? s.endDate.slice(0, 10) : "");
+  }
+
+  async function saveStory(id: string) {
+    await run(`save-${id}`, async () => {
+      const r1 = await updateStory(id, { title: sTitle, userStory: sStory, acceptanceCriteria: sAC.split("\n"), priority: sPri, points: sPts.trim() ? Math.round(Number(sPts)) : null });
+      if (r1?.error) return r1;
+      return setStorySchedule(id, sStart || null, sEnd || null);
+    }, () => setEditId(""));
   }
 
   return (
@@ -158,12 +176,17 @@ export default function EpicDetail({
                   <input value={sTitle} onChange={(e) => setSTitle(e.target.value)} className={field} placeholder="Title" />
                   <textarea value={sStory} onChange={(e) => setSStory(e.target.value)} rows={2} className={field} placeholder="As a …, I want …, so that …" />
                   <textarea value={sAC} onChange={(e) => setSAC(e.target.value)} rows={4} className={field} placeholder="Acceptance criteria — one per line (Given/When/Then)" />
-                  <div className="flex gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     <select value={sPri} onChange={(e) => setSPri(e.target.value)} className={cell}>
                       <option value="must">Must</option><option value="should">Should</option><option value="could">Could</option><option value="wont">Won&apos;t</option>
                     </select>
-                    <input value={sPts} onChange={(e) => setSPts(e.target.value)} type="number" min="0" className={`${cell} w-24`} placeholder="Points" />
-                    <button disabled={busy === `save-${s.id}` || !sTitle.trim()} onClick={() => run(`save-${s.id}`, () => updateStory(s.id, { title: sTitle, userStory: sStory, acceptanceCriteria: sAC.split("\n"), priority: sPri, points: sPts.trim() ? Math.round(Number(sPts)) : null }), () => setEditId(""))} className="rounded-md bg-neutral-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-neutral-800 disabled:opacity-50">Save</button>
+                    <input value={sPts} onChange={(e) => setSPts(e.target.value)} type="number" min="0" className={`${cell} w-20`} placeholder="Points" />
+                    <span className="text-xs text-neutral-400">Pin dates (optional):</span>
+                    <input value={sStart} onChange={(e) => setSStart(e.target.value)} type="date" className={cell} title="Manual start (overrides auto-schedule)" />
+                    <input value={sEnd} onChange={(e) => setSEnd(e.target.value)} type="date" className={cell} title="Manual end" />
+                  </div>
+                  <div className="flex gap-2">
+                    <button disabled={busy === `save-${s.id}` || !sTitle.trim()} onClick={() => saveStory(s.id)} className="rounded-md bg-neutral-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-neutral-800 disabled:opacity-50">Save</button>
                     <button onClick={() => setEditId("")} className="text-xs text-neutral-500 hover:text-neutral-900">Cancel</button>
                   </div>
                 </div>
@@ -174,14 +197,21 @@ export default function EpicDetail({
                       <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${approved ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-700"}`}>{approved ? "Approved" : "Draft"}</span>
                       {pri && <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${pri.cls}`}>{pri.label}</span>}
                       {s.points != null && <span className="rounded-full bg-neutral-100 px-2 py-0.5 text-[11px] font-medium text-neutral-600">{s.points} pts</span>}
+                      {s.startDate && s.endDate && <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-[11px] font-medium text-indigo-700" title="Manually pinned dates">📌 pinned</span>}
                       <span className="font-medium">{s.title}</span>
                     </div>
-                    {canWork && (
+                    {canWork ? (
                       <div className="flex items-center gap-2 text-xs">
+                        <select value={s.assigneeId ?? ""} onChange={(e) => run(`asg-${s.id}`, () => assignStory(s.id, e.target.value || null))} className="rounded-md border border-neutral-300 px-2 py-1 text-xs outline-none focus:border-neutral-900" title="Assignee">
+                          <option value="">Unassigned</option>
+                          {members.map((mem) => <option key={mem.userId} value={mem.userId}>{mem.name}</option>)}
+                        </select>
                         <button onClick={() => startEdit(s)} className="text-neutral-500 hover:text-neutral-900">Edit</button>
                         <button disabled={busy === `appr-${s.id}`} onClick={() => run(`appr-${s.id}`, () => setStoryApproved(s.id, !approved))} className="rounded-md border border-neutral-300 px-2.5 py-1 hover:bg-neutral-50 disabled:opacity-50">{approved ? "Reopen" : "Approve"}</button>
                         <button onClick={() => run(`del-${s.id}`, () => deleteStory(s.id))} className="text-neutral-500 hover:text-red-700">Delete</button>
                       </div>
+                    ) : (
+                      s.assigneeId && <span className="text-xs text-neutral-500">{members.find((mm) => mm.userId === s.assigneeId)?.name ?? "assigned"}</span>
                     )}
                   </div>
                   {s.userStory && <p className="mt-2 text-sm italic text-neutral-700">{s.userStory}</p>}

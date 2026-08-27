@@ -3,7 +3,8 @@
 import { desc, eq } from "drizzle-orm";
 import { getActiveMembership, canCreateProject } from "@/lib/auth-server";
 import { db } from "@/lib/db";
-import { project, playbook, epic, story, aiGeneration, projectCompliance } from "@/lib/db/schema";
+import { and } from "drizzle-orm";
+import { project, playbook, epic, story, aiGeneration, projectCompliance, projectMember } from "@/lib/db/schema";
 import { generateStoriesForEpic } from "@/lib/ai/generate";
 import { LLMConfigError } from "@/lib/ai/provider";
 
@@ -203,5 +204,26 @@ export async function setStoryApproved(storyId: string, approved: boolean) {
   const ctx = await storyCtx(storyId);
   if (!ctx?.canWork) return { error: "Not allowed." };
   await db.update(story).set(approved ? { status: "approved", approvedBy: ctx.m.userId, approvedAt: new Date(), updatedAt: new Date() } : { status: "draft", approvedBy: null, approvedAt: null, updatedAt: new Date() }).where(eq(story.id, storyId));
+  return { ok: true };
+}
+
+export async function assignStory(storyId: string, assigneeId: string | null) {
+  const ctx = await storyCtx(storyId);
+  if (!ctx?.canWork) return { error: "Not allowed." };
+  if (assigneeId) {
+    const pm = (await db.select({ id: projectMember.id }).from(projectMember).where(and(eq(projectMember.projectId, ctx.story.projectId), eq(projectMember.userId, assigneeId))).limit(1))[0];
+    if (!pm) return { error: "Assignee must be a project member." };
+  }
+  await db.update(story).set({ assigneeId, updatedAt: new Date() }).where(eq(story.id, storyId));
+  return { ok: true };
+}
+
+/** Manual schedule pin (hybrid). Pass both dates to pin, or both null to clear (back to auto). */
+export async function setStorySchedule(storyId: string, startDate: string | null, endDate: string | null) {
+  const ctx = await storyCtx(storyId);
+  if (!ctx?.canWork) return { error: "Not allowed." };
+  if ((startDate && !endDate) || (!startDate && endDate)) return { error: "Set both start and end, or clear both to auto-schedule." };
+  if (startDate && endDate && endDate < startDate) return { error: "End can't be before start." };
+  await db.update(story).set({ startDate: startDate || null, endDate: endDate || null, updatedAt: new Date() }).where(eq(story.id, storyId));
   return { ok: true };
 }

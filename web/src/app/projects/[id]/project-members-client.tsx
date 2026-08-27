@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { addProjectMember, removeProjectMember, updateProjectMember } from "../actions";
 
-type Person = { userId: string; name: string; email: string; rate?: number | null; timezone?: string | null };
+type Person = { userId: string; name: string; email: string; rate?: number | null; timezone?: string | null; hoursPerDay?: number | null };
 
 function useTimezones() {
   return useMemo(() => {
@@ -48,11 +48,13 @@ export default function ProjectMembersClient({
   const [toAdd, setToAdd] = useState("");
   const [addRate, setAddRate] = useState("");
   const [addTz, setAddTz] = useState(defaultTz);
+  const [addHpd, setAddHpd] = useState("8");
 
   // edit
   const [editId, setEditId] = useState("");
   const [editRate, setEditRate] = useState("");
   const [editTz, setEditTz] = useState(defaultTz);
+  const [editHpd, setEditHpd] = useState("8");
 
   async function act(id: string, fn: () => Promise<{ error?: string } | void>) {
     setBusy(id);
@@ -78,14 +80,16 @@ export default function ProjectMembersClient({
                 <span className="min-w-40 font-medium">{p.name || p.email}</span>
                 <span className="text-xs text-neutral-400">{currency}/hr</span>
                 <input required type="number" min="0" value={editRate} onChange={(e) => setEditRate(e.target.value)} placeholder="Rate *" className={`${field} w-24`} />
-                <select required value={editTz} onChange={(e) => setEditTz(e.target.value)} className={`${field} w-56`}>
+                <select required value={editTz} onChange={(e) => setEditTz(e.target.value)} className={`${field} w-52`}>
                   {timezones.map((z) => (
                     <option key={z} value={z}>{z}</option>
                   ))}
                 </select>
+                <input type="number" min="1" value={editHpd} onChange={(e) => setEditHpd(e.target.value)} className={`${field} w-16`} title="Hours per day (capacity)" />
+                <span className="text-xs text-neutral-400">h/day</span>
                 <button
                   disabled={busy === p.userId || !editRate.trim() || !editTz}
-                  onClick={() => act(p.userId, () => updateProjectMember(projectId, p.userId, Math.round(Number(editRate)), editTz)).then(() => setEditId(""))}
+                  onClick={() => act(p.userId, () => updateProjectMember(projectId, p.userId, Math.round(Number(editRate)), editTz, editHpd.trim() ? Math.round(Number(editHpd)) : 8)).then(() => setEditId(""))}
                   className="rounded-md bg-neutral-900 px-3 py-1 text-xs font-medium text-white hover:bg-neutral-800"
                 >
                   Save
@@ -102,11 +106,12 @@ export default function ProjectMembersClient({
                   <span className="text-xs text-neutral-500">
                     {p.rate != null ? `${currency} ${p.rate.toLocaleString()}/hr` : "no rate"}
                     {p.timezone ? ` · ${p.timezone}` : ""}
+                    {` · ${p.hoursPerDay ?? 8}h/day`}
                   </span>
                   {canManage && (
                     <>
                       <button
-                        onClick={() => { setEditId(p.userId); setEditRate(p.rate != null ? String(p.rate) : ""); setEditTz(p.timezone || defaultTz); }}
+                        onClick={() => { setEditId(p.userId); setEditRate(p.rate != null ? String(p.rate) : ""); setEditTz(p.timezone || defaultTz); setEditHpd(String(p.hoursPerDay ?? 8)); }}
                         className="rounded-md border border-neutral-300 px-2.5 py-1 text-xs hover:bg-neutral-50"
                       >
                         Edit
@@ -137,13 +142,15 @@ export default function ProjectMembersClient({
           </select>
           <span className="text-xs text-neutral-400">{currency}/hr</span>
           <input required type="number" min="0" value={addRate} onChange={(e) => setAddRate(e.target.value)} placeholder="Rate *" className={`${field} w-24`} />
-          <select required value={addTz} onChange={(e) => setAddTz(e.target.value)} className={`${field} w-52`}>
+          <select required value={addTz} onChange={(e) => setAddTz(e.target.value)} className={`${field} w-44`}>
             {timezones.map((z) => (
               <option key={z} value={z}>{z}</option>
             ))}
           </select>
+          <input type="number" min="1" value={addHpd} onChange={(e) => setAddHpd(e.target.value)} className={`${field} w-16`} title="Hours per day" />
+          <span className="text-xs text-neutral-400">h/day</span>
           <button
-            onClick={() => { if (toAdd && addRate.trim() && addTz) act("add", () => addProjectMember(projectId, toAdd, Math.round(Number(addRate)), addTz)).then(() => { setToAdd(""); setAddRate(""); }); }}
+            onClick={() => { if (toAdd && addRate.trim() && addTz) act("add", () => addProjectMember(projectId, toAdd, Math.round(Number(addRate)), addTz, addHpd.trim() ? Math.round(Number(addHpd)) : 8)).then(() => { setToAdd(""); setAddRate(""); }); }}
             disabled={!toAdd || !addRate.trim() || !addTz || busy === "add"}
             className="rounded-lg bg-neutral-900 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-800 disabled:opacity-50"
           >

@@ -8,6 +8,20 @@ schema, and behavior can change between pre-releases.
 ## [Unreleased]
 
 ### Added
+- **Plan & schedule (budget + timeline + Gantt)** — turns points into a checkable plan.
+  A project sets **1 story point = N hours** (1/2/3/8 or custom, at creation and in
+  settings); each member has an **hours/day capacity**; stories get an **assignee**
+  (and optional manual date pins — hybrid scheduling). A pure engine
+  (`lib/schedule.ts`) computes story hours → cost (× the assignee's rate), schedules
+  each assignee's work back-to-back from the project start skipping weekends, and
+  rolls up per epic/assignee. The **Plan** dashboard (`/projects/[id]/plan`) shows a
+  **Budget** verdict (within / over by X vs. the project budget), a **Timeline**
+  verdict (on time / late / early vs. the expected end), total work, a **Gantt**
+  with two toggle views (by assignee swimlanes / by epic) and an expected-end marker,
+  and a per-assignee hours/cost table. Epics show total story points. Stories flagged
+  when unassigned/unpointed/rate-less (partial cost/timeline). New columns:
+  `project.hoursPerPoint`, `projectMember.hoursPerDay`, `story.assigneeId` +
+  `startDate`/`endDate`.
 - **Epics & stories (spec-to-stories)** — the next link in the delivery chain.
   Promote a playbook's In-scope epics into first-class, editable **Epic** records
   (lineage: source playbook + version), or add epics manually. Each epic generates

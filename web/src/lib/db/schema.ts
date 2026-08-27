@@ -239,6 +239,7 @@ export const project = pgTable(
     description: text("description"),
     budget: integer("budget"), // whole currency units
     currency: text("currency").default("USD").notNull(),
+    hoursPerPoint: integer("hours_per_point").notNull().default(8), // 1 story point = N hours
     startDate: date("start_date"),
     endDate: date("end_date"),
     slackChannel: text("slack_channel"), // project-specific channel id/name, uses the org Slack connector
@@ -262,6 +263,7 @@ export const projectMember = pgTable(
       .references(() => user.id, { onDelete: "cascade" }),
     rate: integer("rate"), // hourly rate, in the project's currency
     timezone: text("timezone"), // IANA tz, e.g. "America/New_York"
+    hoursPerDay: integer("hours_per_day").notNull().default(8), // capacity for scheduling
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (t) => [
@@ -437,6 +439,9 @@ export const story = pgTable(
     acceptanceCriteria: jsonb("acceptance_criteria"), // string[] of Given/When/Then
     priority: text("priority"), // must | should | could | wont
     points: integer("points"),
+    assigneeId: text("assignee_id").references(() => user.id, { onDelete: "set null" }), // a project member
+    startDate: date("start_date"), // manual override pin (hybrid scheduling); null = auto-scheduled
+    endDate: date("end_date"),
     status: text("status").notNull().default("draft"), // draft | approved
     citations: jsonb("citations"), // grounding refs used
     sourcePlaybookId: text("source_playbook_id").references(() => playbook.id, { onDelete: "set null" }),
