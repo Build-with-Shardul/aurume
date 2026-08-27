@@ -169,7 +169,7 @@ export function buildPlaybookPdf(d: PlaybookDocData): Promise<Buffer> {
 
     h2("Approvals");
     if (d.approvers.length === 0) para("No approvers assigned.");
-    else d.approvers.forEach((a) => entry(a.name, a.approvedAt ? `Approved ${a.approvedAt.toLocaleString()}` : "Pending"));
+    else drawTable(["Approver", "Status"], d.approvers.map((a) => [a.name, a.approvedAt ? `Approved ${a.approvedAt.toLocaleString()}` : "Pending"]), [0.45, 0.55]);
 
     h2("Project summary");
     para(c.projectSummary);
