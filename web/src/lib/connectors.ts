@@ -73,6 +73,13 @@ export const CONNECTOR_PROVIDERS: ConnectorProvider[] = [
     available: true,
     fields: [{ key: "baseUrl", label: "Base URL", type: "text", secret: false, placeholder: "http://localhost:11434" }],
   },
+  {
+    id: "figma",
+    name: "Figma",
+    description: "Turn a Figma frame/component link into code (Design → code), in your chosen frontend language.",
+    available: true,
+    fields: [{ key: "token", label: "Personal access token", type: "password", secret: true, placeholder: "figd_..." }],
+  },
   { id: "jira", name: "Jira", description: "Sync stories to your Jira board.", available: false, fields: [] },
 ];
 

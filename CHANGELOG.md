@@ -7,6 +7,22 @@ schema, and behavior can change between pre-releases.
 
 ## [Unreleased]
 
+### Added
+- **Design → code (Figma in the project)** — a new per-project workspace
+  (`/projects/[id]/figma`, card on the project page): paste a Figma frame/component
+  link and generate clean code in a chosen frontend language, following house
+  standards. Ports the `figma-to-code` core into the web app (`lib/figma/*`): parse
+  the link → Figma REST fetch → normalize to a framework-agnostic **design IR**
+  (auto-layout → row/column, resolved colors, text, radius, strokes, component
+  instances, Figma styles resolved as tokens) → build a codegen brief (IR + target
+  profile + Aurume token/component map + house standards) → generate via the org's
+  configured LLM (`generateStructured`, model picker, cost/token telemetry recorded
+  in `ai_generation` as `kind = figma_code`). 12 targets: react-tailwind,
+  html-tailwind, html-css, vue-tailwind, svelte, react-native, swiftui, flutter,
+  angular, qwik, solid, compose. New **Figma connector** (encrypted personal access
+  token) supplies the Figma auth; generated files are shown with copy/download plus
+  the referenced tokens and warnings.
+
 ## [0.2.0] — 2026-08-27
 
 The **AI delivery chain comes online**. On top of the 0.1.0 shell, this release

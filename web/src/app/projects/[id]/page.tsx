@@ -129,6 +129,18 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
           </div>
         </Link>
 
+        <Link
+          href={`/projects/${id}/figma`}
+          className="mt-4 flex items-center justify-between rounded-xl border border-neutral-200 bg-white p-5 hover:border-neutral-400"
+        >
+          <div>
+            <div className="font-medium">🎨 Design → code</div>
+            <p className="mt-1 text-sm text-neutral-500">
+              Paste a Figma frame link; generate clean code in your chosen frontend language, following your standards.
+            </p>
+          </div>
+          <div className="shrink-0 text-neutral-400">→</div>
+        </Link>
       </div>
     </main>
   );
