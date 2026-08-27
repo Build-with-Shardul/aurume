@@ -14,6 +14,7 @@ type Leave = { userId: string; start: string; end: string; type: string };
 const PRI_BAR: Record<string, string> = { must: "bg-red-400", should: "bg-amber-400", could: "bg-blue-400", wont: "bg-neutral-400" };
 const DAY_W = 32;
 const LABEL_W = 210;
+const ROW_H = 30;
 
 type Col = { iso: string; dom: number; month: number; year: number; monthLabel: string; week: number };
 
@@ -53,6 +54,8 @@ function spans<T>(cols: Col[], key: (c: Col) => string, label: (c: Col) => strin
 
 export default function PlanClient({ plan, project, members, leaves, budget, timeline }: { plan: Plan; project: Proj; members: Member[]; leaves: Leave[]; budget: BV; timeline: TV }) {
   const [view, setView] = useState<"role" | "epic">("role");
+  const [showDeps, setShowDeps] = useState(true);
+  const [showCrit, setShowCrit] = useState(true);
   const cur = project.currency;
   const money = (n: number | null) => (n == null ? "—" : formatBudget(Math.round(n), cur));
 
@@ -98,17 +101,56 @@ export default function PlanClient({ plan, project, members, leaves, budget, tim
   const globalUtil = totalCapacity ? Math.round((totalScheduledHours / totalCapacity) * 100) : 0;
   const utilCardTone = totalCapacity === 0 ? "muted" : globalUtil > 100 ? "bad" : globalUtil >= 60 ? "ok" : "muted";
 
-  function barsFor(userId: string) {
-    return scheduled.filter((s) => s.assigneeId === userId).map((s) => ({ id: s.id, title: `${s.title}${s.points != null ? ` · ${s.points}pt` : ""}`, start: s.start!, end: s.end!, priority: s.priority, approved: s.status === "approved" }));
-  }
+  type Bar = { id: string; title: string; start: string; end: string; priority: string | null; approved: boolean; critical: boolean };
+  type LBar = { id: string; start: string; end: string; type: string };
+  const barsFor = (userId: string): Bar[] =>
+    scheduled.filter((s) => s.assigneeId === userId).map((s) => ({ id: s.id, title: `${s.title}${s.points != null ? ` · ${s.points}pt` : ""}`, start: s.start!, end: s.end!, priority: s.priority, approved: s.status === "approved", critical: s.critical }));
 
   // group members by role
   const roleGroups = new Map<string, Member[]>();
   for (const m of members) { const arr = roleGroups.get(m.role) ?? []; arr.push(m); roleGroups.set(m.role, arr); }
 
-  function Track({ bars, leaveBars = [] }: { bars: { id: string; title: string; start: string; end: string; priority: string | null; approved: boolean }[]; leaveBars?: { id: string; start: string; end: string; type: string }[] }) {
+  // Flat, ordered render model so we can map each story's bar to a pixel Y for the dependency-arrow overlay.
+  type RRow =
+    | { kind: "group"; id: string; label: string; util?: number }
+    | { kind: "item"; id: string; label: string; util?: number; bars: Bar[]; leaveBars: LBar[] };
+  const renderRows: RRow[] = [];
+  if (view === "role") {
+    for (const [role, mem] of roleGroups) {
+      const capSum = mem.reduce((a, m) => a + capacity(m), 0);
+      const hrsSum = mem.reduce((a, m) => a + (hoursByUser.get(m.userId) ?? 0), 0);
+      renderRows.push({ kind: "group", id: `role:${role}`, label: role, util: capSum ? Math.round((hrsSum / capSum) * 100) : 0 });
+      for (const m of mem) renderRows.push({ kind: "item", id: m.userId, label: m.name, util: utilPct(m), bars: barsFor(m.userId), leaveBars: leaveRangesFor(m.userId) });
+    }
+  } else {
+    for (const epicName of [...new Map(scheduled.map((s) => [s.epicName, true])).keys()]) {
+      renderRows.push({ kind: "group", id: `epic:${epicName}`, label: epicName });
+      for (const s of scheduled.filter((x) => x.epicName === epicName))
+        renderRows.push({ kind: "item", id: s.id, label: s.title, bars: [{ id: s.id, title: `${s.assigneeName ?? "—"}${s.points != null ? ` · ${s.points}pt` : ""}`, start: s.start!, end: s.end!, priority: s.priority, approved: s.status === "approved", critical: s.critical }], leaveBars: [] });
+    }
+  }
+
+  // Bar geometry per story id → arrow endpoints.
+  const place = new Map<string, { startX: number; endX: number; midY: number }>();
+  renderRows.forEach((r, i) => {
+    if (r.kind !== "item") return;
+    const midY = i * ROW_H + ROW_H / 2;
+    for (const b of r.bars) place.set(b.id, { startX: idxOfStart(b.start) * DAY_W, endX: (idxOfEnd(b.end) + 1) * DAY_W, midY });
+  });
+  const bodyH = renderRows.length * ROW_H;
+  const critOf = new Map(scheduled.map((s) => [s.id, s.critical]));
+  const edges = scheduled.flatMap((s) => {
+    const to = place.get(s.id);
+    if (!to) return [];
+    return (s.dependsOn ?? []).flatMap((d) => {
+      const from = place.get(d);
+      return from ? [{ from, to, critical: !!(s.critical && critOf.get(d)) }] : [];
+    });
+  });
+
+  function Track({ bars, leaveBars = [] }: { bars: Bar[]; leaveBars?: LBar[] }) {
     return (
-      <div className="relative h-7" style={{ width: gridW }}>
+      <div className="relative" style={{ width: gridW, height: ROW_H }}>
         {/* day gridlines */}
         {cols.map((c, i) => (
           <div key={c.iso} className={`absolute inset-y-0 border-l ${c.dom === 1 || i === 0 ? "border-neutral-300" : "border-neutral-100"}`} style={{ left: i * DAY_W, width: DAY_W }} />
@@ -118,7 +160,7 @@ export default function PlanClient({ plan, project, members, leaves, budget, tim
           const l = idxOfStart(lb.start) * DAY_W;
           const w = (idxOfEnd(lb.end) - idxOfStart(lb.start) + 1) * DAY_W;
           return (
-            <div key={lb.id} className="absolute inset-y-0.5 z-[5] flex items-center overflow-hidden rounded px-1 text-[9px] text-neutral-600" style={{ left: l + 1, width: Math.max(DAY_W - 2, w - 2), backgroundImage: "repeating-linear-gradient(45deg,#e5e7eb,#e5e7eb 4px,#f3f4f6 4px,#f3f4f6 8px)" }} title={`${lb.type} ${lb.start} → ${lb.end}`}>
+            <div key={lb.id} className="absolute inset-y-1 z-[5] flex items-center overflow-hidden rounded px-1 text-[9px] text-neutral-600" style={{ left: l + 1, width: Math.max(DAY_W - 2, w - 2), backgroundImage: "repeating-linear-gradient(45deg,#e5e7eb,#e5e7eb 4px,#f3f4f6 4px,#f3f4f6 8px)" }} title={`${lb.type} ${lb.start} → ${lb.end}`}>
               <span className="truncate uppercase tracking-wide">{lb.type}</span>
             </div>
           );
@@ -127,8 +169,9 @@ export default function PlanClient({ plan, project, members, leaves, budget, tim
         {bars.map((b) => {
           const l = idxOfStart(b.start) * DAY_W;
           const w = (idxOfEnd(b.end) - idxOfStart(b.start) + 1) * DAY_W;
+          const crit = showCrit && b.critical;
           return (
-            <div key={b.id} className={`absolute inset-y-1 z-20 flex items-center overflow-hidden rounded px-1.5 text-[10px] text-white ${b.priority ? PRI_BAR[b.priority] ?? "bg-neutral-500" : "bg-neutral-500"} ${b.approved ? "ring-1 ring-green-600" : ""}`} style={{ left: l + 1, width: Math.max(DAY_W - 2, w - 2) }} title={`${b.title} · ${b.start} → ${b.end}`}>
+            <div key={b.id} className={`absolute inset-y-1.5 z-20 flex items-center overflow-hidden rounded px-1.5 text-[10px] text-white ${b.priority ? PRI_BAR[b.priority] ?? "bg-neutral-500" : "bg-neutral-500"} ${crit ? "ring-2 ring-red-500 ring-offset-1" : b.approved ? "ring-1 ring-green-600" : ""}`} style={{ left: l + 1, width: Math.max(DAY_W - 2, w - 2) }} title={`${b.title} · ${b.start} → ${b.end}${b.critical ? " · critical path" : ""}`}>
               <span className="truncate">{b.title}</span>
             </div>
           );
@@ -156,11 +199,21 @@ export default function PlanClient({ plan, project, members, leaves, budget, tim
 
       {/* Gantt */}
       <div className="rounded-xl border border-neutral-200 bg-white">
-        <div className="flex items-center justify-between border-b border-neutral-200 px-5 py-3">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-neutral-200 px-5 py-3">
           <span className="text-sm font-medium">Schedule</span>
-          <div className="flex gap-1 rounded-lg border border-neutral-200 p-0.5 text-xs">
-            <button onClick={() => setView("role")} className={`rounded-md px-3 py-1 ${view === "role" ? "bg-neutral-900 text-white" : "text-neutral-600 hover:bg-neutral-50"}`}>By role</button>
-            <button onClick={() => setView("epic")} className={`rounded-md px-3 py-1 ${view === "epic" ? "bg-neutral-900 text-white" : "text-neutral-600 hover:bg-neutral-50"}`}>By epic</button>
+          <div className="flex flex-wrap items-center gap-3">
+            <label className="flex cursor-pointer items-center gap-1.5 text-xs text-neutral-600">
+              <input type="checkbox" checked={showDeps} onChange={(e) => setShowDeps(e.target.checked)} className="accent-neutral-700" />
+              Dependencies
+            </label>
+            <label className="flex cursor-pointer items-center gap-1.5 text-xs text-neutral-600">
+              <input type="checkbox" checked={showCrit} onChange={(e) => setShowCrit(e.target.checked)} className="accent-red-500" />
+              Critical path
+            </label>
+            <div className="flex gap-1 rounded-lg border border-neutral-200 p-0.5 text-xs">
+              <button onClick={() => setView("role")} className={`rounded-md px-3 py-1 ${view === "role" ? "bg-neutral-900 text-white" : "text-neutral-600 hover:bg-neutral-50"}`}>By role</button>
+              <button onClick={() => setView("epic")} className={`rounded-md px-3 py-1 ${view === "epic" ? "bg-neutral-900 text-white" : "text-neutral-600 hover:bg-neutral-50"}`}>By epic</button>
+            </div>
           </div>
         </div>
 
@@ -180,49 +233,42 @@ export default function PlanClient({ plan, project, members, leaves, budget, tim
               </div>
 
               {/* body */}
-              {view === "role"
-                ? [...roleGroups.entries()].map(([role, mem]) => {
-                    const capSum = mem.reduce((a, m) => a + capacity(m), 0);
-                    const hrsSum = mem.reduce((a, m) => a + (hoursByUser.get(m.userId) ?? 0), 0);
-                    const rUtil = capSum ? Math.round((hrsSum / capSum) * 100) : 0;
-                    return (
-                      <div key={role}>
-                        <div className="flex items-center border-b border-neutral-100 bg-neutral-50/70">
-                          <div className="sticky left-0 z-20 flex shrink-0 items-center gap-2 border-r border-neutral-200 bg-neutral-50/70 px-4 py-2 text-sm font-semibold" style={{ width: LABEL_W }}>
-                            {role}
-                            <span className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${utilTone(rUtil)}`}>{rUtil}%</span>
-                          </div>
-                          <div style={{ width: gridW }} />
-                        </div>
-                        {mem.map((m) => {
-                          const u = utilPct(m);
-                          return (
-                            <div key={m.userId} className="flex items-center border-b border-neutral-50 hover:bg-neutral-50/50">
-                              <div className="sticky left-0 z-20 flex shrink-0 items-center justify-between gap-2 border-r border-neutral-200 bg-white px-4 py-1.5" style={{ width: LABEL_W }}>
-                                <span className="truncate text-xs font-medium text-neutral-800" title={m.name}>{m.name}</span>
-                                <span className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium ${utilTone(u)}`}>{u}%</span>
-                              </div>
-                              <Track bars={barsFor(m.userId)} leaveBars={leaveRangesFor(m.userId)} />
-                            </div>
-                          );
-                        })}
+              <div className="relative">
+                {renderRows.map((r) =>
+                  r.kind === "group" ? (
+                    <div key={r.id} className="flex items-center border-b border-neutral-100 bg-neutral-50/70" style={{ height: ROW_H }}>
+                      <div className="sticky left-0 z-30 flex h-full shrink-0 items-center gap-2 truncate border-r border-neutral-200 bg-neutral-50/70 px-4 text-sm font-semibold" style={{ width: LABEL_W }} title={r.label}>
+                        <span className="truncate">{r.label}</span>
+                        {r.util != null && <span className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium ${utilTone(r.util)}`}>{r.util}%</span>}
                       </div>
-                    );
-                  })
-                : [...new Map(scheduled.map((s) => [s.epicName, true])).keys()].map((epicName) => (
-                    <div key={epicName}>
-                      <div className="flex items-center border-b border-neutral-100 bg-neutral-50/70">
-                        <div className="sticky left-0 z-20 shrink-0 truncate border-r border-neutral-200 bg-neutral-50/70 px-4 py-2 text-sm font-semibold" style={{ width: LABEL_W }} title={epicName}>{epicName}</div>
-                        <div style={{ width: gridW }} />
-                      </div>
-                      {scheduled.filter((s) => s.epicName === epicName).map((s) => (
-                        <div key={s.id} className="flex items-center border-b border-neutral-50 hover:bg-neutral-50/50">
-                          <div className="sticky left-0 z-20 shrink-0 truncate border-r border-neutral-200 bg-white px-4 py-1.5 text-xs text-neutral-700" style={{ width: LABEL_W }} title={s.title}>{s.title}</div>
-                          <Track bars={[{ id: s.id, title: `${s.assigneeName ?? "—"}${s.points != null ? ` · ${s.points}pt` : ""}`, start: s.start!, end: s.end!, priority: s.priority, approved: s.status === "approved" }]} />
-                        </div>
-                      ))}
+                      <div style={{ width: gridW }} />
                     </div>
-                  ))}
+                  ) : (
+                    <div key={r.id} className="flex items-center border-b border-neutral-50 hover:bg-neutral-50/50" style={{ height: ROW_H }}>
+                      <div className="sticky left-0 z-30 flex h-full shrink-0 items-center justify-between gap-2 border-r border-neutral-200 bg-white px-4" style={{ width: LABEL_W }}>
+                        <span className="truncate text-xs font-medium text-neutral-800" title={r.label}>{r.label}</span>
+                        {r.util != null && <span className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium ${utilTone(r.util)}`}>{r.util}%</span>}
+                      </div>
+                      <Track bars={r.bars} leaveBars={r.leaveBars} />
+                    </div>
+                  ),
+                )}
+                {/* dependency + critical-path arrows */}
+                {showDeps && edges.length > 0 && (
+                  <svg className="pointer-events-none absolute top-0 z-[24]" style={{ left: LABEL_W }} width={gridW} height={bodyH}>
+                    <defs>
+                      <marker id="dep-arrow" markerWidth="7" markerHeight="7" refX="5.5" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#9ca3af" /></marker>
+                      <marker id="dep-arrow-crit" markerWidth="7" markerHeight="7" refX="5.5" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#ef4444" /></marker>
+                    </defs>
+                    {edges.map((e, i) => {
+                      const x1 = e.from.endX, y1 = e.from.midY, x2 = e.to.startX, y2 = e.to.midY;
+                      const vx = Math.max(x1 + 8, x2 - 8);
+                      const crit = showCrit && e.critical;
+                      return <path key={i} d={`M${x1},${y1} L${vx},${y1} L${vx},${y2} L${x2 - 2},${y2}`} fill="none" stroke={crit ? "#ef4444" : "#9ca3af"} strokeWidth={crit ? 2 : 1.25} strokeDasharray={crit ? undefined : "3 2"} markerEnd={`url(#${crit ? "dep-arrow-crit" : "dep-arrow"})`} opacity={crit ? 0.95 : 0.75} />;
+                    })}
+                  </svg>
+                )}
+              </div>
             </div>
           </div>
         )}
@@ -232,6 +278,8 @@ export default function PlanClient({ plan, project, members, leaves, budget, tim
           <span className="flex items-center gap-1"><i className="inline-block h-2 w-2 rounded bg-blue-400" />Could</span>
           <span className="flex items-center gap-1"><i className="inline-block h-2 w-2 rounded bg-neutral-400" />Won&apos;t</span>
           {expectedLeft != null && <span className="flex items-center gap-1"><i className="inline-block h-2.5 w-px bg-red-400" />Expected end</span>}
+          <span className="flex items-center gap-1"><i className="inline-block h-2 w-4 rounded-sm ring-2 ring-red-500" />Critical path</span>
+          <span className="flex items-center gap-1"><svg width="16" height="6"><line x1="0" y1="3" x2="16" y2="3" stroke="#9ca3af" strokeWidth="1.25" strokeDasharray="3 2" /></svg>Dependency</span>
           <span>% = utilization over this window · Ring = approved</span>
           {project.endDate && !expectedInRange && <span>Expected end {project.endDate} is beyond the chart (well after the last task).</span>}
         </div>

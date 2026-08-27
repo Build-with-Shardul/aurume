@@ -29,6 +29,8 @@ export type ScheduledStory = {
   status: string;
   assigneeId: string | null;
   assigneeName: string | null;
+  dependsOn: string[];
+  critical: boolean; // on the critical path (drives the projected end)
   hours: number;
   cost: number | null;
   start: string | null; // ISO date
@@ -120,6 +122,7 @@ export function computePlan(
     return {
       id: s.id, epicId: s.epicId, epicName: s.epicName, title: s.title, points: s.points, priority: s.priority,
       status: s.status, assigneeId: s.assigneeId, assigneeName: mem?.name ?? null,
+      dependsOn: s.dependsOn ?? [], critical: false,
       hours, cost, start: null, end: null, pinned: !!(s.startDate && s.endDate),
     };
   });
@@ -180,6 +183,28 @@ export function computePlan(
   const dated = scheduled.filter((s) => s.start && s.end);
   const projectedStart = dated.length ? dated.map((s) => s.start!).sort()[0] : project.startDate;
   const projectedEnd = dated.length ? dated.map((s) => s.end!).sort().slice(-1)[0] : null;
+
+  // Critical path: walk back from the last-finishing story through whichever predecessor
+  // (a dependency, or the same assignee's prior task) ended latest and thus set its start.
+  // Any slip along this chain moves the projected end.
+  if (projectedEnd) {
+    const bindingPredecessor = (s: ScheduledStory): ScheduledStory | null => {
+      let best: ScheduledStory | null = null;
+      const consider = (c: ScheduledStory | undefined | null) => {
+        if (!c || !c.end || !s.start || c.end > s.start) return; // must finish by s's start
+        if (!best || c.end > best.end!) best = c;
+      };
+      for (const d of s.dependsOn) consider(byId.get(d)); // cross-assignee dependency
+      if (s.assigneeId) for (const o of dated) if (o.assigneeId === s.assigneeId && o.id !== s.id) consider(o); // resource predecessor
+      return best;
+    };
+    let cur: ScheduledStory | null = dated.filter((s) => s.end === projectedEnd).sort((a, b) => (a.start! < b.start! ? -1 : 1))[0] ?? null;
+    let guard2 = dated.length + 5;
+    while (cur && !cur.critical && guard2-- > 0) {
+      cur.critical = true;
+      cur = bindingPredecessor(cur);
+    }
+  }
   const totalHours = scheduled.reduce((a, s) => a + s.hours, 0);
   const costs = scheduled.filter((s) => s.cost != null);
   const totalCost = costs.length ? costs.reduce((a, s) => a + (s.cost ?? 0), 0) : null;

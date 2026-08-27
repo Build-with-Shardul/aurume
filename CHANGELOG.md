@@ -8,6 +8,21 @@ schema, and behavior can change between pre-releases.
 ## [Unreleased]
 
 ### Added
+- **Gantt dependency arrows + critical-path highlighting** — the schedule now draws an
+  arrow from each dependency to the story it blocks (elbow connectors, in both the
+  by-role and by-epic views), and highlights the **critical path** — the chain of
+  stories (dependency hops and same-assignee sequencing) that sets the projected end,
+  computed in the engine (`ScheduledStory.critical`) by walking back from the
+  last-finishing story through whichever predecessor ended latest. Critical bars get a
+  red ring and critical dependency arrows turn solid red; a slip anywhere on that chain
+  moves the end date. Toggles for **Dependencies** and **Critical path**; legend updated.
+- **Project page: Plan & schedule promoted to the top** — the plan is now the primary
+  (dark, emphasized) card above Knowledge space, instead of a trailing block.
+
+### Changed
+- Gantt rows use a fixed-height flat render model so bar geometry maps to pixels for
+  the arrow overlay.
+
 - **Story dependencies (cross-assignee cascade)** — a story can now depend on other
   stories ("depends on" picker in the story editor, `story.dependsOn`). The scheduler
   is dependency-aware: a story starts no earlier than its assignee is free AND all its

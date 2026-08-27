@@ -69,8 +69,21 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
         </div>
 
         <Link
+          href={`/projects/${id}/plan`}
+          className="mt-6 flex items-center justify-between rounded-xl border border-neutral-900 bg-neutral-900 p-5 text-white hover:border-neutral-700 hover:bg-neutral-800"
+        >
+          <div>
+            <div className="font-medium">📊 Plan &amp; schedule</div>
+            <p className="mt-1 text-sm text-neutral-300">
+              Points → hours → cost by assignee, checked against budget and dates, on a Gantt with dependencies and critical path.
+            </p>
+          </div>
+          <div className="shrink-0 text-neutral-400">→</div>
+        </Link>
+
+        <Link
           href={`/projects/${id}/knowledge`}
-          className="mt-6 flex items-center justify-between rounded-xl border border-neutral-200 bg-white p-5 hover:border-neutral-400"
+          className="mt-4 flex items-center justify-between rounded-xl border border-neutral-200 bg-white p-5 hover:border-neutral-400"
         >
           <div>
             <div className="font-medium">📚 Knowledge space</div>
@@ -116,18 +129,6 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
           </div>
         </Link>
 
-        <Link
-          href={`/projects/${id}/plan`}
-          className="mt-4 flex items-center justify-between rounded-xl border border-neutral-200 bg-white p-5 hover:border-neutral-400"
-        >
-          <div>
-            <div className="font-medium">📊 Plan &amp; schedule</div>
-            <p className="mt-1 text-sm text-neutral-500">
-              Points → hours → cost by assignee, checked against budget and dates, on a Gantt.
-            </p>
-          </div>
-          <div className="shrink-0 text-neutral-400">→</div>
-        </Link>
       </div>
     </main>
   );
