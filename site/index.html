@@ -69,6 +69,9 @@
   .stack-label{flex:none;min-width:170px;color:var(--muted);font-size:12.5px;font-weight:600;text-transform:uppercase;letter-spacing:.1em}
   .pills{display:flex;gap:8px;flex-wrap:wrap}
   .pill{border:1px solid var(--line-strong);border-radius:999px;padding:6px 14px;font-size:14px;color:var(--ink);background:rgba(255,255,255,.03)}
+  .pill.soon{border-style:dashed;border-color:var(--line);color:var(--muted);background:transparent}
+  .stack-note{margin:22px 0 0;font-size:13px;color:var(--faint)}
+  .stack-note .dash{display:inline-block;border:1px dashed var(--line-strong);border-radius:999px;width:20px;height:12px;vertical-align:-1px;margin-right:4px}
   @media(max-width:640px){.stack-label{min-width:100%}}
 
   /* roadmap */
@@ -147,20 +150,21 @@
     <div class="stack">
       <div class="stack-group"><span class="stack-label">Platform shell</span><div class="pills"><span class="pill">Next.js</span><span class="pill">TypeScript</span><span class="pill">Tailwind</span></div></div>
       <div class="stack-group"><span class="stack-label">Auth &amp; RBAC</span><div class="pills"><span class="pill">Better Auth</span><span class="pill">Multi-org</span></div></div>
-      <div class="stack-group"><span class="stack-label">Data</span><div class="pills"><span class="pill">PostgreSQL</span><span class="pill">Neon</span><span class="pill">Drizzle ORM</span><span class="pill">pgvector</span></div></div>
+      <div class="stack-group"><span class="stack-label">Data</span><div class="pills"><span class="pill">PostgreSQL</span><span class="pill">Neon</span><span class="pill">Drizzle ORM</span><span class="pill soon">pgvector</span></div></div>
       <div class="stack-group"><span class="stack-label">Integrations</span><div class="pills"><span class="pill">Resend</span><span class="pill">Slack</span><span class="pill">Teams</span></div></div>
-      <div class="stack-group"><span class="stack-label">AI services</span><div class="pills"><span class="pill">Python</span><span class="pill">FastAPI</span><span class="pill">LangGraph</span></div></div>
+      <div class="stack-group"><span class="stack-label">AI layer</span><div class="pills"><span class="pill">TypeScript</span><span class="pill">Structured outputs · Zod</span><span class="pill soon">Python · FastAPI</span><span class="pill soon">LangGraph</span></div></div>
       <div class="stack-group"><span class="stack-label">Models · BYO key</span><div class="pills"><span class="pill">Anthropic</span><span class="pill">OpenAI</span><span class="pill">Ollama</span></div></div>
-      <div class="stack-group"><span class="stack-label">QA &amp; runtime</span><div class="pills"><span class="pill">Playwright</span><span class="pill">Docker</span><span class="pill">GitHub Actions</span><span class="pill">AGPLv3</span></div></div>
+      <div class="stack-group"><span class="stack-label">QA &amp; runtime</span><div class="pills"><span class="pill soon">Playwright</span><span class="pill">Docker</span><span class="pill">GitHub Actions</span><span class="pill">AGPLv3</span></div></div>
     </div>
+    <p class="stack-note"><span class="dash"></span>Dashed = decided but not yet built. The live AI features run in TypeScript inside the shell; a Python/FastAPI + LangGraph service (with pgvector RAG) is the planned split for orchestration and retrieval.</p>
   </div>
 </section>
 
 <section class="block" id="roadmap">
   <div class="wrap">
     <span class="eyebrow">Roadmap</span>
-    <h2>Shipped in the open, one repo at a time.</h2>
-    <p class="sub">The platform spine shipped first — workspace, roles, projects, and a knowledge base. The first grounded AI features and the planning layer are now live; the rest land as independent, documented, benchmarked repos the platform assembles. Honest status — only what exists is marked so.</p>
+    <h2>Shipped in the open, capability by capability.</h2>
+    <p class="sub">The platform spine and the first grounded AI features are live. Capabilities ship in the open — some inside the aurume repo, others as their own documented, benchmarked repos the platform assembles. Honest status — only what exists is marked live.</p>
     <div class="road">
       <div class="road-row"><span class="road-name">aurume</span><span class="road-what">Multi-org workspace, RBAC, projects, connectors, knowledge space, planning &amp; Gantt</span><span class="status now">Live · v0.2.0</span></div>
       <div class="road-row"><span class="road-name">playbook-drafter</span><span class="road-what">Grounded, structured product-playbook generation</span><span class="status now">Live</span></div>
