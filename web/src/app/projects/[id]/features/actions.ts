@@ -7,6 +7,7 @@ import { feature, playbook, playbookApprover, aiGeneration, project, member, use
 import { generateProductPlaybookDraft } from "@/lib/ai/generate";
 import { LLMConfigError } from "@/lib/ai/provider";
 import { PlaybookContentSchema } from "@/lib/ai/playbook";
+import { markTechDocStale } from "../tdd/actions";
 
 async function loadProjectCtx(projectId: string) {
   const m = await getActiveMembership();
@@ -28,6 +29,8 @@ async function latestPlaybook(projectId: string) {
 /** Features changed → the product playbook no longer reflects the project. */
 async function markPlaybookStale(projectId: string) {
   await db.update(playbook).set({ stale: true }).where(eq(playbook.projectId, projectId));
+  // The tech doc grounds on the playbook + features, so the same changes stale it too.
+  await markTechDocStale(projectId);
 }
 
 export async function createFeature(projectId: string, title: string, brief: string) {
@@ -176,6 +179,8 @@ export async function generateProductPlaybook(projectId: string, model?: string)
     createdBy: ctx.m.userId,
   });
 
+  await markTechDocStale(projectId); // a new playbook version means the tech doc is behind
+
   return { ok: true, playbookId, version, groundedness: draft.groundedness };
 }
 
@@ -197,6 +202,7 @@ export async function savePlaybookContent(playbookId: string, content: unknown) 
   const parsed = PlaybookContentSchema.safeParse(content);
   if (!parsed.success) return { error: "Invalid playbook content." };
   await db.update(playbook).set({ content: parsed.data, edited: true, updatedAt: new Date() }).where(eq(playbook.id, playbookId));
+  await markTechDocStale(ctx.playbook.projectId); // playbook edited → tech doc is behind
   return { ok: true };
 }
 

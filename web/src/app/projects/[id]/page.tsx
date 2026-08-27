@@ -114,6 +114,32 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
         </Link>
 
         <Link
+          href={`/projects/${id}/figma`}
+          className="mt-4 flex items-center justify-between rounded-xl border border-neutral-200 bg-white p-5 hover:border-neutral-400"
+        >
+          <div>
+            <div className="font-medium">🎨 Design → code</div>
+            <p className="mt-1 text-sm text-neutral-500">
+              Paste a Figma frame link; generate clean code in your chosen frontend language, following your standards.
+            </p>
+          </div>
+          <div className="shrink-0 text-neutral-400">→</div>
+        </Link>
+
+        <Link
+          href={`/projects/${id}/tdd`}
+          className="mt-4 flex items-center justify-between rounded-xl border border-neutral-200 bg-white p-5 hover:border-neutral-400"
+        >
+          <div>
+            <div className="font-medium">📐 Technical Design Document</div>
+            <p className="mt-1 text-sm text-neutral-500">
+              The technical counterpart to the playbook — architecture, data model, APIs, security, rollout. Grounded, versioned, approvable.
+            </p>
+          </div>
+          <div className="shrink-0 text-neutral-400">→</div>
+        </Link>
+
+        <Link
           href={`/projects/${id}/epics`}
           className="mt-4 flex items-center justify-between rounded-xl border border-neutral-200 bg-white p-5 hover:border-neutral-400"
         >
@@ -127,19 +153,6 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
             <div className="text-lg font-semibold">{epicCount}</div>
             <div className="text-xs text-neutral-400">epic{epicCount === 1 ? "" : "s"}</div>
           </div>
-        </Link>
-
-        <Link
-          href={`/projects/${id}/figma`}
-          className="mt-4 flex items-center justify-between rounded-xl border border-neutral-200 bg-white p-5 hover:border-neutral-400"
-        >
-          <div>
-            <div className="font-medium">🎨 Design → code</div>
-            <p className="mt-1 text-sm text-neutral-500">
-              Paste a Figma frame link; generate clean code in your chosen frontend language, following your standards.
-            </p>
-          </div>
-          <div className="shrink-0 text-neutral-400">→</div>
         </Link>
       </div>
     </main>

@@ -8,6 +8,19 @@ schema, and behavior can change between pre-releases.
 ## [Unreleased]
 
 ### Added
+- **Technical Design Document (TDD)** — a first-class AI artifact, the technical
+  counterpart to the product playbook, with the same lifecycle. One per project
+  (`/projects/[id]/tdd`, card on the project page below Design → code): AI-generated
+  and grounded in the **playbook** (lineage: `sourcePlaybookId`/version) plus features,
+  compliance, and knowledge. Structured sections — overview, goals/non-goals,
+  architecture, components, data model, APIs, key flows, technology choices, security &
+  privacy, scalability, observability, risks & tradeoffs, testing strategy, rollout
+  plan, open questions — a mix of prose and editable tables. Versioned, editable,
+  **multi-approver** approval (all must approve; approvals carried forward on
+  regenerate), goes **out of date** when the playbook or features change, with a
+  groundedness score, model picker, per-version generation log, and token/cost
+  telemetry (`kind = techdoc`). New tables: `tech_doc`, `tech_doc_approver`. Verified
+  live: 100% grounded, compliance-aware (GDPR/HIPAA) generation from the playbook.
 - **Design → code (Figma in the project)** — a new per-project workspace
   (`/projects/[id]/figma`, card on the project page): paste a Figma frame/component
   link and generate clean code in a chosen frontend language, following house

@@ -17,6 +17,14 @@ import {
   scoreStoriesGroundedness,
   type StoriesResult,
 } from "./stories";
+import {
+  TechDocContentSchema,
+  TECHDOC_SYSTEM,
+  buildTechDocPrompt,
+  sanitizeCitations as sanitizeTechDocCitations,
+  scoreGroundedness as scoreTechDocGroundedness,
+  type TechDocContent,
+} from "./techdoc";
 
 export type PlaybookDraft = {
   content: PlaybookContent;
@@ -57,6 +65,67 @@ export async function generateProductPlaybookDraft(params: {
 
   const content = sanitizeCitations(res.data, validRefs);
   const groundedness = scoreGroundedness(content, validRefs, refs.length);
+
+  return {
+    content,
+    groundedness,
+    provider: res.provider,
+    model: res.model,
+    promptTokens: res.promptTokens,
+    completionTokens: res.completionTokens,
+    costUsdMicros: res.costUsdMicros,
+    sourceVersion: sourceVersionHash(refs),
+    sourceKnowledge: refs.map((r) => ({ id: r.id, updatedAt: r.updatedAtISO })),
+    knowledgeCount: refs.length,
+  };
+}
+
+export type TechDocDraft = {
+  content: TechDocContent;
+  groundedness: number;
+  provider: string;
+  model: string;
+  promptTokens: number;
+  completionTokens: number;
+  costUsdMicros: number | null;
+  sourceVersion: string;
+  sourceKnowledge: Array<{ id: string; updatedAt: string }>;
+  knowledgeCount: number;
+};
+
+/** Generate the grounded, structured Technical Design Document for a project. Pure — the caller persists it. */
+export async function generateTechDocDraft(params: {
+  orgId: string;
+  projectId: string;
+  project: { name: string; description: string | null };
+  playbook: {
+    summary: string;
+    hypothesis: string;
+    projectType: string;
+    epics: Array<{ name: string; scopeDetail: string }>;
+    kpis: Array<{ metric: string; targetValue: string }>;
+    operational: string;
+  } | null;
+  features: Array<{ title: string; brief: string | null }>;
+  compliances: string[];
+  model?: string;
+}): Promise<TechDocDraft> {
+  const knowledge = await getKnowledgeForAI(params.projectId);
+  const { contextText, refs } = buildKnowledgeContext(knowledge);
+  const validRefs = new Set(refs.map((r) => r.ref));
+
+  const prompt = buildTechDocPrompt(params.project, params.playbook, params.features, params.compliances, contextText);
+  const res = await generateStructured({
+    orgId: params.orgId,
+    system: TECHDOC_SYSTEM,
+    prompt,
+    schema: TechDocContentSchema,
+    schemaName: "tech_doc",
+    model: params.model,
+  });
+
+  const content = sanitizeTechDocCitations(res.data, validRefs);
+  const groundedness = scoreTechDocGroundedness(content, validRefs, refs.length);
 
   return {
     content,

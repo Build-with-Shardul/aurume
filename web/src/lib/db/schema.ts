@@ -415,6 +415,56 @@ export const playbookApprover = pgTable(
   (t) => [uniqueIndex("playbook_approver_uidx").on(t.playbookId, t.userId)],
 );
 
+// A Technical Design Document — the technical counterpart to the product playbook,
+// one per project, versioned and approvable the same way. Grounded in the playbook
+// (lineage: sourcePlaybookId + sourcePlaybookVersion) plus features, compliance, and
+// knowledge; goes stale when the playbook or features change.
+export const techDoc = pgTable(
+  "tech_doc",
+  {
+    id: text("id").primaryKey(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    projectId: text("project_id")
+      .notNull()
+      .references(() => project.id, { onDelete: "cascade" }),
+    version: integer("version").notNull().default(1),
+    status: text("status").notNull().default("draft"), // draft | approved
+    stale: boolean("stale").notNull().default(false),
+    content: jsonb("content").notNull(),
+    groundedness: integer("groundedness"),
+    edited: boolean("edited").notNull().default(false),
+    provider: text("provider"),
+    model: text("model"),
+    sourceVersion: text("source_version"), // knowledge fingerprint
+    sourceKnowledge: jsonb("source_knowledge"),
+    sourcePlaybookId: text("source_playbook_id"),
+    sourcePlaybookVersion: text("source_playbook_version"),
+    createdBy: text("created_by").references(() => user.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+    approvedAt: timestamp("approved_at"),
+  },
+  (t) => [index("tech_doc_project_idx").on(t.projectId)],
+);
+
+export const techDocApprover = pgTable(
+  "tech_doc_approver",
+  {
+    id: text("id").primaryKey(),
+    techDocId: text("tech_doc_id")
+      .notNull()
+      .references(() => techDoc.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    approvedAt: timestamp("approved_at"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => [uniqueIndex("tech_doc_approver_uidx").on(t.techDocId, t.userId)],
+);
+
 // An Epic — the next link in the delivery chain, promoted from a playbook's
 // in-scope epics (or added manually). Lineage: sourcePlaybookId + sourceVersion.
 export const epic = pgTable(
