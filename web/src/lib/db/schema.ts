@@ -365,14 +365,30 @@ export const playbook = pgTable(
     model: text("model"),
     sourceVersion: text("source_version"),
     sourceKnowledge: jsonb("source_knowledge"),
-    approverId: text("approver_id").references(() => user.id, { onDelete: "set null" }), // who should approve
     createdBy: text("created_by").references(() => user.id, { onDelete: "set null" }),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
-    approvedBy: text("approved_by").references(() => user.id, { onDelete: "set null" }),
-    approvedAt: timestamp("approved_at"),
+    approvedAt: timestamp("approved_at"), // when ALL assigned approvers had approved (fully approved)
   },
   (t) => [index("playbook_project_idx").on(t.projectId)],
+);
+
+// A playbook can have MULTIPLE assigned approvers; each records their own approval
+// timestamp. The playbook is fully approved once every assigned approver has approved.
+export const playbookApprover = pgTable(
+  "playbook_approver",
+  {
+    id: text("id").primaryKey(),
+    playbookId: text("playbook_id")
+      .notNull()
+      .references(() => playbook.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    approvedAt: timestamp("approved_at"), // null = pending
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => [uniqueIndex("playbook_approver_uidx").on(t.playbookId, t.userId)],
 );
 
 // Telemetry for every AI generation — the "metrics over autonomy" thesis. Records

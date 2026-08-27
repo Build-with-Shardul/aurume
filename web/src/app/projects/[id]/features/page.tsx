@@ -3,7 +3,8 @@ import Link from "next/link";
 import { desc, eq } from "drizzle-orm";
 import { getActiveMembership, canCreateProject, canManageOrg } from "@/lib/auth-server";
 import { db } from "@/lib/db";
-import { project, feature, playbook, member, user, projectCompliance, aiGeneration } from "@/lib/db/schema";
+import { project, feature, playbook, playbookApprover, member, user, projectCompliance, aiGeneration } from "@/lib/db/schema";
+import { currentProvider, MODEL_OPTIONS, defaultModel } from "@/lib/ai/provider";
 import PlaybookWorkspace, { type PlaybookView } from "./workspace-client";
 
 export default async function FeaturesPage({ params }: { params: Promise<{ id: string }> }) {
@@ -45,6 +46,47 @@ export default async function FeaturesPage({ params }: { params: Promise<{ id: s
   const canWork = canCreateProject(m.role) || p.createdBy === m.userId;
   const isOrgAdmin = canManageOrg(m.role);
 
+  const approverRows = pb
+    ? await db
+        .select({ userId: playbookApprover.userId, name: user.name, email: user.email, approvedAt: playbookApprover.approvedAt })
+        .from(playbookApprover)
+        .innerJoin(user, eq(user.id, playbookApprover.userId))
+        .where(eq(playbookApprover.playbookId, pb.id))
+    : [];
+
+  // Generation log: every generation for this project, newest first, with its version.
+  const logRows = await db
+    .select({
+      version: playbook.version,
+      createdAt: aiGeneration.createdAt,
+      model: aiGeneration.model,
+      provider: aiGeneration.provider,
+      prompt: aiGeneration.promptTokens,
+      completion: aiGeneration.completionTokens,
+      cost: aiGeneration.costUsdMicros,
+      groundedness: aiGeneration.groundedness,
+      outcome: aiGeneration.outcome,
+    })
+    .from(aiGeneration)
+    .leftJoin(playbook, eq(playbook.id, aiGeneration.playbookId))
+    .where(eq(aiGeneration.projectId, id))
+    .orderBy(desc(aiGeneration.createdAt));
+
+  const generationLog = logRows.map((r) => ({
+    version: r.version ?? null,
+    at: r.createdAt.toISOString(),
+    model: r.provider && r.model ? `${r.provider}/${r.model}` : r.model ?? "—",
+    tokens: (r.prompt ?? 0) + (r.completion ?? 0),
+    promptTokens: r.prompt ?? 0,
+    completionTokens: r.completion ?? 0,
+    costUsdMicros: r.cost ?? null,
+    groundedness: r.groundedness,
+    outcome: r.outcome,
+  }));
+
+  const provider = currentProvider();
+  const modelInfo = { provider, options: MODEL_OPTIONS[provider], defaultModel: defaultModel(provider) };
+
   const playbookView: PlaybookView | null = pb
     ? {
         id: pb.id,
@@ -56,9 +98,7 @@ export default async function FeaturesPage({ params }: { params: Promise<{ id: s
         provider: pb.provider,
         model: pb.model,
         edited: pb.edited,
-        approverId: pb.approverId,
-        approverName: pb.approverId ? members.find((x) => x.userId === pb.approverId)?.name ?? members.find((x) => x.userId === pb.approverId)?.email ?? null : null,
-        canApprove: (pb.approverId ? pb.approverId === m.userId : canWork) || isOrgAdmin,
+        approvers: approverRows.map((a) => ({ userId: a.userId, name: a.name || a.email, approvedAt: a.approvedAt ? a.approvedAt.toISOString() : null })),
         promptTokens: gen?.prompt ?? null,
         completionTokens: gen?.completion ?? null,
         costUsdMicros: gen?.cost ?? null,
@@ -89,6 +129,9 @@ export default async function FeaturesPage({ params }: { params: Promise<{ id: s
             members={members}
             compliances={compliances}
             canWork={canWork}
+            meId={m.userId}
+            modelInfo={modelInfo}
+            generationLog={generationLog}
           />
         </div>
       </div>

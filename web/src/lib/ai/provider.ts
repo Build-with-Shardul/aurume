@@ -12,6 +12,22 @@ const DEFAULT_MODEL: Record<ProviderId, string> = {
   ollama: "llama3.1",
 };
 
+// Selectable models per provider (shown in the generate UI). Ollama is free-form.
+export const MODEL_OPTIONS: Record<ProviderId, string[]> = {
+  anthropic: ["claude-opus-5", "claude-sonnet-5", "claude-haiku-4-5", "claude-opus-4-8"],
+  openai: ["gpt-4o", "gpt-4o-mini"],
+  ollama: [],
+};
+
+export function currentProvider(): ProviderId {
+  const p = (process.env.AURUME_LLM_PROVIDER || "anthropic").toLowerCase();
+  return (["anthropic", "openai", "ollama"].includes(p) ? p : "anthropic") as ProviderId;
+}
+
+export function defaultModel(provider: ProviderId): string {
+  return process.env.AURUME_LLM_MODEL || DEFAULT_MODEL[provider];
+}
+
 // USD per 1M tokens, [input, output]. Unknown models → cost not estimated.
 const RATES: Record<string, [number, number]> = {
   "claude-opus-5": [5, 25],
@@ -48,12 +64,11 @@ type Config =
   | { provider: "anthropic" | "openai"; model: string; apiKey: string }
   | { provider: "ollama"; model: string; baseUrl: string };
 
-async function resolveConfig(orgId: string): Promise<Config> {
-  const provider = (process.env.AURUME_LLM_PROVIDER || "anthropic").toLowerCase() as ProviderId;
-  if (!["anthropic", "openai", "ollama"].includes(provider)) {
-    throw new LLMConfigError(`Unknown AURUME_LLM_PROVIDER "${provider}". Use anthropic, openai, or ollama.`);
-  }
-  const model = process.env.AURUME_LLM_MODEL || DEFAULT_MODEL[provider];
+async function resolveConfig(orgId: string, modelOverride?: string): Promise<Config> {
+  const provider = currentProvider();
+  // Only honor an override that's a known model for this provider (or free-form for ollama).
+  const allowed = MODEL_OPTIONS[provider];
+  const model = modelOverride && (provider === "ollama" || allowed.includes(modelOverride)) ? modelOverride : defaultModel(provider);
   const conn = await getConnector(orgId, provider).catch(() => null);
 
   if (provider === "ollama") {
@@ -81,8 +96,9 @@ export async function generateStructured<T>(opts: {
   schema: z.ZodType<T>;
   schemaName: string;
   maxTokens?: number;
+  model?: string;
 }): Promise<GenResult<T>> {
-  const cfg = await resolveConfig(opts.orgId);
+  const cfg = await resolveConfig(opts.orgId, opts.model);
   const maxTokens = opts.maxTokens ?? 16000;
 
   if (cfg.provider === "ollama") {

@@ -32,6 +32,7 @@ export async function generateProductPlaybookDraft(params: {
   features: Array<{ title: string; brief: string | null }>;
   members: Array<{ name: string; discipline: string | null }>;
   compliances: string[];
+  model?: string;
 }): Promise<PlaybookDraft> {
   const knowledge = await getKnowledgeForAI(params.projectId);
   const { contextText, refs } = buildKnowledgeContext(knowledge);
@@ -44,6 +45,7 @@ export async function generateProductPlaybookDraft(params: {
     prompt,
     schema: PlaybookContentSchema,
     schemaName: "playbook",
+    model: params.model,
   });
 
   const content = sanitizeCitations(res.data, validRefs);

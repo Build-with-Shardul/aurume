@@ -10,7 +10,7 @@ import {
   deleteFeature,
   generateProductPlaybook,
   savePlaybookContent,
-  setPlaybookApprover,
+  setApprovers,
   approvePlaybook,
   setCompliance,
 } from "./actions";
@@ -44,14 +44,14 @@ export type PlaybookView = {
   provider: string | null;
   model: string | null;
   edited: boolean;
-  approverId: string | null;
-  approverName: string | null;
-  canApprove: boolean;
+  approvers: Array<{ userId: string; name: string; approvedAt: string | null }>;
   promptTokens: number | null;
   completionTokens: number | null;
   costUsdMicros: number | null;
 };
 type Member = { userId: string; name: string | null; email: string; discipline: string | null };
+type ModelInfo = { provider: string; options: string[]; defaultModel: string };
+type LogEntry = { version: number | null; at: string; model: string; tokens: number; promptTokens: number; completionTokens: number; costUsdMicros: number | null; groundedness: number | null; outcome: string };
 
 const field = "w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-neutral-900";
 const cell = "rounded-md border border-neutral-300 px-2 py-1 text-sm outline-none focus:border-neutral-900";
@@ -76,6 +76,9 @@ export default function PlaybookWorkspace({
   members,
   compliances,
   canWork,
+  meId,
+  modelInfo,
+  generationLog,
 }: {
   projectId: string;
   features: Feature[];
@@ -83,10 +86,15 @@ export default function PlaybookWorkspace({
   members: Member[];
   compliances: Compliance[];
   canWork: boolean;
+  meId: string;
+  modelInfo: ModelInfo;
+  generationLog: LogEntry[];
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState("");
   const [err, setErr] = useState("");
+  const [model, setModel] = useState(modelInfo.options.includes(modelInfo.defaultModel) ? modelInfo.defaultModel : modelInfo.options[0] ?? "");
+  const [showLog, setShowLog] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
   const [aTitle, setATitle] = useState("");
   const [aBrief, setABrief] = useState("");
@@ -222,8 +230,17 @@ export default function PlaybookWorkspace({
         {!playbook || !view ? (
           <div className="rounded-xl border border-dashed border-neutral-300 bg-white p-10 text-center">
             <div className="text-lg font-medium">No product playbook yet</div>
-            <p className="mx-auto mt-1 max-w-md text-sm text-neutral-500">One grounded, structured product playbook — synthesized from this product&apos;s features and your knowledge. You review, assign an approver, and approve.</p>
-            {canWork && <button disabled={busy === "gen"} onClick={() => run("gen", () => generateProductPlaybook(projectId))} className="mt-4 rounded-lg bg-neutral-900 px-5 py-2.5 text-sm font-medium text-white hover:bg-neutral-800 disabled:opacity-50">{busy === "gen" ? "Generating…" : "Generate product playbook"}</button>}
+            <p className="mx-auto mt-1 max-w-md text-sm text-neutral-500">One grounded, structured product playbook — synthesized from this product&apos;s features and your knowledge. You review, assign approvers, and approve.</p>
+            {canWork && (
+              <div className="mt-4 flex items-center justify-center gap-2">
+                {modelInfo.options.length > 0 && (
+                  <select value={model} onChange={(e) => setModel(e.target.value)} className={cell} title="Model">
+                    {modelInfo.options.map((mo) => <option key={mo} value={mo}>{mo}</option>)}
+                  </select>
+                )}
+                <button disabled={busy === "gen"} onClick={() => run("gen", () => generateProductPlaybook(projectId, model))} className="rounded-lg bg-neutral-900 px-5 py-2.5 text-sm font-medium text-white hover:bg-neutral-800 disabled:opacity-50">{busy === "gen" ? "Generating…" : "Generate product playbook"}</button>
+              </div>
+            )}
           </div>
         ) : (
           <div className="space-y-4">
@@ -251,32 +268,66 @@ export default function PlaybookWorkspace({
                       <button onClick={() => { setPbEditing(false); setDraft(null); }} className="text-xs text-neutral-500 hover:text-neutral-900">Cancel</button>
                     </>
                   )}
-                  <button disabled={busy === "gen"} onClick={() => run("gen", () => generateProductPlaybook(projectId))} className="rounded-md border border-neutral-300 px-3 py-1.5 text-xs hover:bg-neutral-50 disabled:opacity-50">{busy === "gen" ? "…" : playbook.stale ? "Update playbook" : "Regenerate"}</button>
+                  {modelInfo.options.length > 0 && (
+                    <select value={model} onChange={(e) => setModel(e.target.value)} className="rounded-md border border-neutral-300 px-2 py-1 text-xs outline-none focus:border-neutral-900" title="Model for the next generation">
+                      {modelInfo.options.map((mo) => <option key={mo} value={mo}>{mo}</option>)}
+                    </select>
+                  )}
+                  <button disabled={busy === "gen"} onClick={() => run("gen", () => generateProductPlaybook(projectId, model))} className="rounded-md border border-neutral-300 px-3 py-1.5 text-xs hover:bg-neutral-50 disabled:opacity-50">{busy === "gen" ? "…" : playbook.stale ? "Update playbook" : "Regenerate"}</button>
                 </div>
               )}
             </div>
 
             {playbook.stale && <p className="rounded-lg border border-orange-200 bg-orange-50 px-3 py-2 text-xs text-orange-800">Features or knowledge changed since this version. Click <strong>Update playbook</strong> to regenerate.</p>}
 
-            {/* approver + approve */}
-            <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-neutral-200 bg-white px-5 py-3">
-              <div className="flex items-center gap-2 text-sm">
-                <span className="text-neutral-500">Approver:</span>
-                {canWork ? (
-                  <select value={playbook.approverId ?? ""} onChange={(e) => run("approver", () => setPlaybookApprover(playbook.id, e.target.value || null))} className={cell}>
-                    <option value="">— unassigned —</option>
-                    {members.map((mem) => <option key={mem.userId} value={mem.userId}>{mem.name || mem.email}</option>)}
-                  </select>
-                ) : (
-                  <span className="font-medium">{playbook.approverName ?? "unassigned"}</span>
-                )}
-              </div>
-              {!approved && (playbook.canApprove ? (
-                <button disabled={busy === "approve"} onClick={() => run("approve", () => approvePlaybook(playbook.id))} className="rounded-lg bg-neutral-900 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-800 disabled:opacity-50">{busy === "approve" ? "Approving…" : "Approve playbook"}</button>
-              ) : (
-                <span className="text-xs text-neutral-500">Waiting on {playbook.approverName ?? "an approver"} to approve</span>
-              ))}
-            </div>
+            {/* approvers + approve */}
+            {(() => {
+              const approverIds = playbook.approvers.map((a) => a.userId);
+              const mine = playbook.approvers.find((a) => a.userId === meId);
+              const meCanApprove = playbook.approvers.length === 0 ? canWork : !!mine && !mine.approvedAt;
+              const addable = members.filter((mem) => !approverIds.includes(mem.userId));
+              return (
+                <div className="rounded-xl border border-neutral-200 bg-white px-5 py-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium">Approvers</span>
+                    {!approved && meCanApprove && (
+                      <button disabled={busy === "approve"} onClick={() => run("approve", () => approvePlaybook(playbook.id))} className="rounded-lg bg-neutral-900 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-800 disabled:opacity-50">
+                        {busy === "approve" ? "Approving…" : playbook.approvers.length === 0 ? "Approve" : "Approve (as me)"}
+                      </button>
+                    )}
+                  </div>
+                  {playbook.approvers.length === 0 ? (
+                    <p className="mt-1 text-xs text-neutral-400">No approvers assigned{canWork ? " — add one or more below." : "."}</p>
+                  ) : (
+                    <ul className="mt-2 space-y-1">
+                      {playbook.approvers.map((a) => (
+                        <li key={a.userId} className="flex items-center justify-between text-sm">
+                          <span>{a.name}{a.userId === meId && <span className="ml-1 text-xs text-neutral-400">(you)</span>}</span>
+                          <span className="flex items-center gap-2">
+                            {a.approvedAt ? (
+                              <span className="text-xs text-green-600">✓ Approved {new Date(a.approvedAt).toLocaleString()}</span>
+                            ) : (
+                              <span className="text-xs text-amber-600">Pending</span>
+                            )}
+                            {canWork && !approved && (
+                              <button onClick={() => run(`unapprover-${a.userId}`, () => setApprovers(playbook.id, approverIds.filter((x) => x !== a.userId)))} className="text-xs text-neutral-400 hover:text-red-700" title="Remove approver">✕</button>
+                            )}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  {canWork && !approved && addable.length > 0 && (
+                    <div className="mt-2">
+                      <select value="" onChange={(e) => { if (e.target.value) run("addapprover", () => setApprovers(playbook.id, [...approverIds, e.target.value])); }} className={cell}>
+                        <option value="">+ Add approver…</option>
+                        {addable.map((mem) => <option key={mem.userId} value={mem.userId}>{mem.name || mem.email}</option>)}
+                      </select>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
 
             {/* ---- Summary & Key Hypothesis ---- */}
             <Block title="Summary & key hypothesis">
@@ -453,6 +504,40 @@ export default function PlaybookWorkspace({
             </Block>
 
             {g < 100 && <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">Groundedness is informational — it reflects how much of your knowledge base the AI cited. Review AI-generated content before approving; agents propose, you commit.</p>}
+
+            {/* ---- Generation log ---- */}
+            {generationLog.length > 0 && (
+              <div className="rounded-xl border border-neutral-200 bg-white">
+                <button onClick={() => setShowLog((v) => !v)} className="flex w-full items-center justify-between px-5 py-3 text-sm font-medium">
+                  <span>Generation log ({generationLog.length})</span>
+                  <span className="text-xs text-neutral-400">
+                    {generationLog.reduce((s, e) => s + e.tokens, 0).toLocaleString()} tokens total
+                    {generationLog.some((e) => e.costUsdMicros != null) && ` · ~$${(generationLog.reduce((s, e) => s + (e.costUsdMicros ?? 0), 0) / 1e6).toFixed(3)}`}
+                    {" "}{showLog ? "▲" : "▼"}
+                  </span>
+                </button>
+                {showLog && (
+                  <div className="overflow-x-auto border-t border-neutral-100">
+                    <table className="w-full border-collapse">
+                      <thead><tr className="border-b border-neutral-100"><th className={th}>Ver</th><th className={th}>When</th><th className={th}>Model</th><th className={th}>Tokens (in/out)</th><th className={th}>Cost</th><th className={th}>Grounded</th><th className={th}>Outcome</th></tr></thead>
+                      <tbody>
+                        {generationLog.map((e, i) => (
+                          <tr key={i} className="border-b border-neutral-50">
+                            <td className={td}>{e.version != null ? `v${e.version}` : "—"}</td>
+                            <td className={td}>{new Date(e.at).toLocaleString()}</td>
+                            <td className={td}>{e.model}</td>
+                            <td className={td}>{e.tokens.toLocaleString()} <span className="text-neutral-400">({e.promptTokens.toLocaleString()}/{e.completionTokens.toLocaleString()})</span></td>
+                            <td className={td}>{e.costUsdMicros != null ? `~$${(e.costUsdMicros / 1e6).toFixed(3)}` : "—"}</td>
+                            <td className={td}>{e.groundedness != null ? `${e.groundedness}%` : "—"}</td>
+                            <td className={td}>{e.outcome}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
       </section>

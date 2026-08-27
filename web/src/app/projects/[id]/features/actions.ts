@@ -3,7 +3,7 @@
 import { and, desc, eq } from "drizzle-orm";
 import { getActiveMembership, canCreateProject, canManageOrg } from "@/lib/auth-server";
 import { db } from "@/lib/db";
-import { feature, playbook, aiGeneration, project, member, user, projectCompliance } from "@/lib/db/schema";
+import { feature, playbook, playbookApprover, aiGeneration, project, member, user, projectCompliance } from "@/lib/db/schema";
 import { generateProductPlaybookDraft } from "@/lib/ai/generate";
 import { LLMConfigError } from "@/lib/ai/provider";
 import { PlaybookContentSchema } from "@/lib/ai/playbook";
@@ -93,7 +93,7 @@ export async function deleteFeature(featureId: string) {
   return { ok: true };
 }
 
-export async function generateProductPlaybook(projectId: string) {
+export async function generateProductPlaybook(projectId: string, model?: string) {
   const ctx = await loadProjectCtx(projectId);
   if (!ctx) return { error: "Not allowed." };
   if (!ctx.canWork) return { error: "You don't have permission to generate the playbook." };
@@ -124,6 +124,7 @@ export async function generateProductPlaybook(projectId: string) {
       features,
       members: members.map((mem) => ({ name: mem.name || mem.email, discipline: mem.discipline })),
       compliances: compliances.map((c) => c.label),
+      model,
     });
   } catch (e) {
     if (e instanceof LLMConfigError) return { error: e.message };
@@ -146,9 +147,18 @@ export async function generateProductPlaybook(projectId: string) {
     model: draft.model,
     sourceVersion: draft.sourceVersion,
     sourceKnowledge: draft.sourceKnowledge,
-    approverId: prev?.approverId ?? null, // carry the assigned approver forward
     createdBy: ctx.m.userId,
   });
+
+  // Carry the assigned approver set forward to the new version (reset to pending).
+  if (prev) {
+    const prevApprovers = await db.select({ userId: playbookApprover.userId }).from(playbookApprover).where(eq(playbookApprover.playbookId, prev.id));
+    if (prevApprovers.length) {
+      await db.insert(playbookApprover).values(
+        prevApprovers.map((a) => ({ id: crypto.randomUUID(), playbookId, userId: a.userId, approvedAt: null })),
+      );
+    }
+  }
 
   await db.insert(aiGeneration).values({
     id: crypto.randomUUID(),
@@ -190,29 +200,65 @@ export async function savePlaybookContent(playbookId: string, content: unknown) 
   return { ok: true };
 }
 
-export async function setPlaybookApprover(playbookId: string, approverId: string | null) {
+/** Replace the assigned approver set for a playbook (multiple allowed). Keeps existing approvals for retained approvers. */
+export async function setApprovers(playbookId: string, userIds: string[]) {
   const ctx = await loadPlaybookCtx(playbookId);
   if (!ctx) return { error: "Not allowed." };
-  if (!ctx.canWork) return { error: "You don't have permission to set the approver." };
-  if (approverId) {
-    // approver must be a member of the org
-    const isMember = (await db.select({ id: member.id }).from(member).where(and(eq(member.organizationId, ctx.m.orgId!), eq(member.userId, approverId))).limit(1))[0];
-    if (!isMember) return { error: "That person isn't in this workspace." };
+  if (!ctx.canWork) return { error: "You don't have permission to set approvers." };
+
+  const valid = new Set(
+    (await db.select({ userId: member.userId }).from(member).where(eq(member.organizationId, ctx.m.orgId!))).map((r) => r.userId),
+  );
+  const want = Array.from(new Set(userIds.filter((u) => valid.has(u))));
+
+  const existing = await db.select({ userId: playbookApprover.userId }).from(playbookApprover).where(eq(playbookApprover.playbookId, playbookId));
+  const have = new Set(existing.map((e) => e.userId));
+
+  for (const u of want) {
+    if (!have.has(u)) {
+      await db.insert(playbookApprover).values({ id: crypto.randomUUID(), playbookId, userId: u, approvedAt: null }).onConflictDoNothing();
+    }
   }
-  await db.update(playbook).set({ approverId, updatedAt: new Date() }).where(eq(playbook.id, playbookId));
+  for (const e of existing) {
+    if (!want.includes(e.userId)) {
+      await db.delete(playbookApprover).where(and(eq(playbookApprover.playbookId, playbookId), eq(playbookApprover.userId, e.userId)));
+    }
+  }
+  // Changing the approver set means it's not fully approved unless everyone remaining has approved.
+  await recomputeApprovalStatus(playbookId);
   return { ok: true };
+}
+
+/** Set the playbook approved (or not) based on whether every assigned approver has approved. */
+async function recomputeApprovalStatus(playbookId: string) {
+  const rows = await db.select({ approvedAt: playbookApprover.approvedAt }).from(playbookApprover).where(eq(playbookApprover.playbookId, playbookId));
+  const fullyApproved = rows.length > 0 && rows.every((r) => r.approvedAt != null);
+  await db
+    .update(playbook)
+    .set({ status: fullyApproved ? "approved" : "draft", approvedAt: fullyApproved ? new Date() : null })
+    .where(eq(playbook.id, playbookId));
+  return fullyApproved;
 }
 
 export async function approvePlaybook(playbookId: string) {
   const ctx = await loadPlaybookCtx(playbookId);
   if (!ctx) return { error: "Not allowed." };
-  const pb = ctx.playbook;
-  // The assigned approver approves; org owners/admins can always approve.
-  const isApprover = pb.approverId ? pb.approverId === ctx.m.userId : ctx.canWork;
-  if (!isApprover && !canManageOrg(ctx.m.role)) {
-    return { error: "Only the assigned approver can approve this playbook." };
+
+  const approvers = await db.select().from(playbookApprover).where(eq(playbookApprover.playbookId, playbookId));
+
+  if (approvers.length === 0) {
+    // No approvers assigned — a project manager may approve directly.
+    if (!ctx.canWork && !canManageOrg(ctx.m.role)) return { error: "Assign an approver, or ask a manager to approve." };
+    await db.update(playbook).set({ status: "approved", stale: false, approvedAt: new Date(), updatedAt: new Date() }).where(eq(playbook.id, playbookId));
+  } else {
+    const mine = approvers.find((a) => a.userId === ctx.m.userId);
+    if (!mine) return { error: "You're not an assigned approver for this playbook." };
+    if (!mine.approvedAt) {
+      await db.update(playbookApprover).set({ approvedAt: new Date() }).where(eq(playbookApprover.id, mine.id));
+    }
+    await recomputeApprovalStatus(playbookId);
   }
-  await db.update(playbook).set({ status: "approved", stale: false, approvedBy: ctx.m.userId, approvedAt: new Date(), updatedAt: new Date() }).where(eq(playbook.id, playbookId));
-  await db.update(aiGeneration).set({ outcome: pb.edited ? "edited" : "approved" }).where(and(eq(aiGeneration.playbookId, playbookId), eq(aiGeneration.outcome, "generated")));
+
+  await db.update(aiGeneration).set({ outcome: ctx.playbook.edited ? "edited" : "approved" }).where(and(eq(aiGeneration.playbookId, playbookId), eq(aiGeneration.outcome, "generated")));
   return { ok: true };
 }
