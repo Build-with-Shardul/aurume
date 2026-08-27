@@ -31,7 +31,7 @@ export default async function Home() {
         </div>
       )}
       <header className="border-b border-neutral-200 bg-white">
-        <div className="mx-auto flex max-w-4xl items-center justify-between px-6 py-4">
+        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
           <span className="font-semibold">Aurume</span>
           <div className="flex items-center gap-4 text-sm">
             {instanceAdmin && (
@@ -45,7 +45,7 @@ export default async function Home() {
         </div>
       </header>
 
-      <div className="mx-auto max-w-4xl px-6 py-10">
+      <div className="mx-auto max-w-6xl px-6 py-10">
         <h1 className="text-2xl font-semibold">
           Welcome{session.user.name ? `, ${session.user.name}` : ""}.
         </h1>
@@ -87,6 +87,14 @@ export default async function Home() {
                   className="inline-block rounded-lg border border-neutral-300 px-4 py-2 text-sm font-medium text-neutral-800 hover:bg-neutral-50"
                 >
                   Connectors
+                </Link>
+              )}
+              {canManage && (
+                <Link
+                  href="/usage"
+                  className="inline-block rounded-lg border border-neutral-300 px-4 py-2 text-sm font-medium text-neutral-800 hover:bg-neutral-50"
+                >
+                  AI usage
                 </Link>
               )}
             </div>
