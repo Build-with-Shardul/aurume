@@ -19,8 +19,10 @@ schema, and behavior can change between pre-releases.
   **multi-approver** approval (all must approve; approvals carried forward on
   regenerate), goes **out of date** when the playbook or features change, with a
   groundedness score, model picker, per-version generation log, and token/cost
-  telemetry (`kind = techdoc`). New tables: `tech_doc`, `tech_doc_approver`. Verified
-  live: 100% grounded, compliance-aware (GDPR/HIPAA) generation from the playbook.
+  telemetry (`kind = techdoc`), and **Word/PDF export** (bordered, colored-header
+  tables + approval status, same as the playbook). New tables: `tech_doc`,
+  `tech_doc_approver`. Verified live: 100% grounded, compliance-aware (GDPR/HIPAA)
+  generation from the playbook, and valid PDF/DOCX export.
 - **Design → code (Figma in the project)** — a new per-project workspace
   (`/projects/[id]/figma`, card on the project page): paste a Figma frame/component
   link and generate clean code in a chosen frontend language, following house

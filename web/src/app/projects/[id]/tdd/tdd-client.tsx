@@ -144,6 +144,10 @@ export default function TechDocWorkspace({
                   {busy === "approve" ? "Approving…" : techDoc.approvers.length === 0 ? "Approve" : "Approve as me"}
                 </button>
               )}
+              <span className="ml-auto flex items-center gap-2">
+                <a href={`/api/projects/${projectId}/tdd/download?format=pdf`} className="rounded-lg border border-neutral-300 px-3 py-1.5 text-sm font-medium hover:border-neutral-400">Download PDF</a>
+                <a href={`/api/projects/${projectId}/tdd/download?format=docx`} className="rounded-lg border border-neutral-300 px-3 py-1.5 text-sm font-medium hover:border-neutral-400">Word</a>
+              </span>
             </>
           ) : (
             <>
