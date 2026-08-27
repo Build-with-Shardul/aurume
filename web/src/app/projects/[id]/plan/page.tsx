@@ -3,8 +3,9 @@ import Link from "next/link";
 import { asc, eq } from "drizzle-orm";
 import { getActiveMembership } from "@/lib/auth-server";
 import { db } from "@/lib/db";
-import { project, projectMember, epic, story, user } from "@/lib/db/schema";
+import { project, projectMember, member, epic, story, user } from "@/lib/db/schema";
 import { computePlan, budgetVerdict, timelineVerdict, type PlanStoryInput } from "@/lib/schedule";
+import { DISCIPLINE_LABEL } from "@/lib/permissions";
 import PlanClient from "./plan-client";
 
 export default async function PlanPage({ params }: { params: Promise<{ id: string }> }) {
@@ -15,11 +16,17 @@ export default async function PlanPage({ params }: { params: Promise<{ id: strin
   const p = (await db.select().from(project).where(eq(project.id, id)).limit(1))[0];
   if (!p || p.organizationId !== m.orgId) notFound();
 
+  const disciplineByUser = new Map(
+    (await db.select({ userId: member.userId, discipline: member.discipline }).from(member).where(eq(member.organizationId, m.orgId!))).map((r) => [r.userId, r.discipline]),
+  );
   const members = (await db
     .select({ userId: projectMember.userId, name: user.name, email: user.email, rate: projectMember.rate, hoursPerDay: projectMember.hoursPerDay })
     .from(projectMember)
     .innerJoin(user, eq(user.id, projectMember.userId))
-    .where(eq(projectMember.projectId, id))).map((mm) => ({ userId: mm.userId, name: mm.name || mm.email, rate: mm.rate, hoursPerDay: mm.hoursPerDay }));
+    .where(eq(projectMember.projectId, id))).map((mm) => {
+      const disc = disciplineByUser.get(mm.userId) ?? null;
+      return { userId: mm.userId, name: mm.name || mm.email, rate: mm.rate, hoursPerDay: mm.hoursPerDay, role: disc ? DISCIPLINE_LABEL[disc] ?? disc : "Unassigned role" };
+    });
 
   const epics = await db.select({ id: epic.id, name: epic.name, orderIndex: epic.orderIndex }).from(epic).where(eq(epic.projectId, id)).orderBy(asc(epic.orderIndex));
   const epicMeta = new Map(epics.map((e, i) => [e.id, { order: e.orderIndex ?? i, name: e.name }]));
@@ -70,6 +77,7 @@ export default async function PlanPage({ params }: { params: Promise<{ id: strin
           <PlanClient
             plan={plan}
             project={{ budget: p.budget, currency: p.currency, startDate: p.startDate, endDate: p.endDate, hoursPerPoint: p.hoursPerPoint }}
+            members={members.map((mm) => ({ userId: mm.userId, name: mm.name, role: mm.role, hoursPerDay: mm.hoursPerDay }))}
             budget={bv}
             timeline={tv}
           />
