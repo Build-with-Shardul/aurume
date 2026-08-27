@@ -391,6 +391,66 @@ export const playbookApprover = pgTable(
   (t) => [uniqueIndex("playbook_approver_uidx").on(t.playbookId, t.userId)],
 );
 
+// An Epic — the next link in the delivery chain, promoted from a playbook's
+// in-scope epics (or added manually). Lineage: sourcePlaybookId + sourceVersion.
+export const epic = pgTable(
+  "epic",
+  {
+    id: text("id").primaryKey(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    projectId: text("project_id")
+      .notNull()
+      .references(() => project.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    scopeDetail: text("scope_detail"),
+    jiraId: text("jira_id"),
+    jiraUrl: text("jira_url"),
+    orderIndex: integer("order_index").notNull().default(0),
+    sourcePlaybookId: text("source_playbook_id").references(() => playbook.id, { onDelete: "set null" }),
+    sourceVersion: text("source_version"), // playbook version fingerprint at promotion time
+    createdBy: text("created_by").references(() => user.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (t) => [index("epic_project_idx").on(t.projectId)],
+);
+
+// A user Story under an epic — AI-generated (spec-to-stories), grounded, then
+// human-reviewed/approved. Agents propose; the story is committed on approval.
+export const story = pgTable(
+  "story",
+  {
+    id: text("id").primaryKey(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    projectId: text("project_id")
+      .notNull()
+      .references(() => project.id, { onDelete: "cascade" }),
+    epicId: text("epic_id")
+      .notNull()
+      .references(() => epic.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    userStory: text("user_story"), // "As a <role>, I want <capability>, so that <benefit>"
+    acceptanceCriteria: jsonb("acceptance_criteria"), // string[] of Given/When/Then
+    priority: text("priority"), // must | should | could | wont
+    points: integer("points"),
+    status: text("status").notNull().default("draft"), // draft | approved
+    citations: jsonb("citations"), // grounding refs used
+    sourcePlaybookId: text("source_playbook_id").references(() => playbook.id, { onDelete: "set null" }),
+    sourceVersion: text("source_version"),
+    sourceApproved: boolean("source_approved").notNull().default(false), // was the source playbook approved at generation?
+    createdBy: text("created_by").references(() => user.id, { onDelete: "set null" }),
+    approvedBy: text("approved_by").references(() => user.id, { onDelete: "set null" }),
+    approvedAt: timestamp("approved_at"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (t) => [index("story_epic_idx").on(t.epicId), index("story_project_idx").on(t.projectId)],
+);
+
 // Telemetry for every AI generation — the "metrics over autonomy" thesis. Records
 // cost/tokens/latency/model + groundedness at generation, and the human outcome
 // (approved / edited / rejected) once the draft is acted on.
@@ -404,7 +464,8 @@ export const aiGeneration = pgTable(
     projectId: text("project_id"),
     featureId: text("feature_id"),
     playbookId: text("playbook_id"),
-    kind: text("kind").notNull().default("playbook"),
+    epicId: text("epic_id"),
+    kind: text("kind").notNull().default("playbook"), // playbook | stories
     provider: text("provider"),
     model: text("model"),
     promptTokens: integer("prompt_tokens"),

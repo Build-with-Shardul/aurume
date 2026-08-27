@@ -3,7 +3,7 @@ import Link from "next/link";
 import { eq } from "drizzle-orm";
 import { getActiveMembership, canManageOrg } from "@/lib/auth-server";
 import { db } from "@/lib/db";
-import { project, projectMember, knowledgeItem, feature } from "@/lib/db/schema";
+import { project, projectMember, knowledgeItem, feature, epic } from "@/lib/db/schema";
 import { formatBudget } from "@/lib/currencies";
 import { isoToMmddyyyy, isProjectStarted } from "@/lib/dates";
 
@@ -23,6 +23,9 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
   ).length;
   const featureCount = (
     await db.select({ id: feature.id }).from(feature).where(eq(feature.projectId, id))
+  ).length;
+  const epicCount = (
+    await db.select({ id: epic.id }).from(epic).where(eq(epic.projectId, id))
   ).length;
 
   const canManage = canManageOrg(m.role) || p.createdBy === m.userId;
@@ -94,6 +97,22 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
           <div className="shrink-0 text-right">
             <div className="text-lg font-semibold">{featureCount}</div>
             <div className="text-xs text-neutral-400">feature{featureCount === 1 ? "" : "s"}</div>
+          </div>
+        </Link>
+
+        <Link
+          href={`/projects/${id}/epics`}
+          className="mt-4 flex items-center justify-between rounded-xl border border-neutral-200 bg-white p-5 hover:border-neutral-400"
+        >
+          <div>
+            <div className="font-medium">🧱 Epics & stories</div>
+            <p className="mt-1 text-sm text-neutral-500">
+              Break the playbook into epics, then generate grounded user stories with acceptance criteria.
+            </p>
+          </div>
+          <div className="shrink-0 text-right">
+            <div className="text-lg font-semibold">{epicCount}</div>
+            <div className="text-xs text-neutral-400">epic{epicCount === 1 ? "" : "s"}</div>
           </div>
         </Link>
       </div>

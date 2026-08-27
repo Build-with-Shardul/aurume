@@ -8,6 +8,17 @@ schema, and behavior can change between pre-releases.
 ## [Unreleased]
 
 ### Added
+- **Epics & stories (spec-to-stories)** — the next link in the delivery chain.
+  Promote a playbook's In-scope epics into first-class, editable **Epic** records
+  (lineage: source playbook + version), or add epics manually. Each epic generates
+  grounded **user stories** via AI: "As a / I want / So that" + **Given/When/Then
+  acceptance criteria** + MoSCoW priority + story points + citations, reflecting the
+  project's compliance selections. Stories are drafts you review, edit, and
+  approve individually (agents propose, humans commit). Stories can be generated
+  from an unapproved playbook — a warning shows and the lineage records whether the
+  source was approved. Reuses the provider-agnostic model picker, groundedness
+  scoring, and token/cost telemetry (kind = stories, in the usage dashboard).
+  New tables: `epic`, `story`.
 - **Playbook drafter (v1)** — grounded, structured product-playbook generation, the
   first AI feature. A project has many **Features** but **one product playbook**,
   synthesized from all its features plus `getKnowledgeForAI` (org + project
