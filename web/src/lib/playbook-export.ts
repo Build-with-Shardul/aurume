@@ -39,12 +39,13 @@ export async function buildPlaybookDocx(d: PlaybookDocData): Promise<Buffer> {
   const P = (text: string) => new Paragraph({ children: [new TextRun(text || "—")], spacing: { after: 80 } });
   const meta = (label: string, val: string) => new Paragraph({ children: [new TextRun({ text: `${label}: `, bold: true }), new TextRun(val)], spacing: { after: 20 } });
 
+  const HEADER_FILL = "1F2937"; // slate-800
   function table(headers: string[], rows: string[][]) {
-    const border = { style: "single" as const, size: 4, color: "E5E5E5" };
+    const border = { style: "single" as const, size: 4, color: "BFBFBF" };
     const borders = { top: border, bottom: border, left: border, right: border };
     const headerRow = new TableRow({
       tableHeader: true,
-      children: headers.map((h) => new TableCell({ borders, shading: { fill: "F5F5F5" }, children: [new Paragraph({ children: [new TextRun({ text: h, bold: true, size: 18 })] })] })),
+      children: headers.map((h) => new TableCell({ borders, shading: { fill: HEADER_FILL }, children: [new Paragraph({ children: [new TextRun({ text: h, bold: true, color: "FFFFFF", size: 18 })] })] })),
     });
     const bodyRows = rows.length
       ? rows.map((r) => new TableRow({ children: r.map((c2) => new TableCell({ borders, children: [new Paragraph({ children: [new TextRun({ text: c2 || "—", size: 20 })] })] })) }))
@@ -118,6 +119,46 @@ export function buildPlaybookPdf(d: PlaybookDocData): Promise<Buffer> {
     const kv = (k: string, v: string) => { doc.font("Helvetica-Bold").fontSize(9).fillColor("#555").text(`${k}: `, { continued: true }).font("Helvetica").fillColor("#333").text(v); };
     const entry = (title: string, body?: string) => { doc.font("Helvetica-Bold").fontSize(10).fillColor("#111").text(`• ${title}`, { width: W }); if (body) doc.font("Helvetica").fontSize(9.5).fillColor("#444").text(body, { width: W, indent: 12 }); doc.moveDown(0.2); };
 
+    // A bordered grid table with a colored header row.
+    const drawTable = (headers: string[], rows: string[][], fractions: number[]) => {
+      const startX = doc.page.margins.left;
+      const totalW = doc.page.width - doc.page.margins.left - doc.page.margins.right;
+      const colW = fractions.map((f) => f * totalW);
+      const pad = 5;
+      const fs = 9;
+      const headerFill = "#1F2937";
+      const lineColor = "#C7CDD4";
+      const bottom = () => doc.page.height - doc.page.margins.bottom;
+      const rowH = (cells: string[], bold: boolean) => {
+        doc.font(bold ? "Helvetica-Bold" : "Helvetica").fontSize(fs);
+        let mx = 12;
+        cells.forEach((c2, i) => { const h = doc.heightOfString(c2 || "—", { width: colW[i] - 2 * pad }); if (h > mx) mx = h; });
+        return mx + 2 * pad;
+      };
+      const drawRow = (cells: string[], y: number, h: number, fill: string | null, textColor: string, bold: boolean) => {
+        let x = startX;
+        cells.forEach((c2, i) => {
+          if (fill) doc.save().rect(x, y, colW[i], h).fill(fill).restore();
+          doc.lineWidth(0.5).strokeColor(lineColor).rect(x, y, colW[i], h).stroke();
+          doc.font(bold ? "Helvetica-Bold" : "Helvetica").fontSize(fs).fillColor(textColor).text(c2 || "—", x + pad, y + pad, { width: colW[i] - 2 * pad });
+          x += colW[i];
+        });
+      };
+      const header = () => { const h = rowH(headers, true); const y = doc.y; drawRow(headers, y, h, headerFill, "#FFFFFF", true); doc.y = y + h; };
+      if (doc.y + 44 > bottom()) doc.addPage();
+      header();
+      const body = rows.length ? rows : [headers.map(() => "—")];
+      body.forEach((r) => {
+        const h = rowH(r, false);
+        if (doc.y + h > bottom()) { doc.addPage(); header(); }
+        const y = doc.y;
+        drawRow(r, y, h, null, "#333333", false);
+        doc.y = y + h;
+      });
+      doc.x = startX; // reset horizontal cursor so following headings/paragraphs start at the left margin
+      doc.moveDown(0.6);
+    };
+
     doc.font("Helvetica-Bold").fontSize(18).fillColor("#111").text(`Product Playbook — ${d.projectName}`, { width: W });
     doc.moveDown(0.4);
     kv("Version", `v${d.version}`);
@@ -138,19 +179,15 @@ export function buildPlaybookPdf(d: PlaybookDocData): Promise<Buffer> {
     para(TYPE_LABEL(c.projectType));
 
     h2("Key technology stakeholders");
-    if (!c.techStakeholders.length) para("—");
-    c.techStakeholders.forEach((s) => entry(s.name, `${s.team} — ${s.projectRole}`));
+    drawTable(["Name", "Team", "Project role"], c.techStakeholders.map((s) => [s.name, s.team, s.projectRole]), [0.28, 0.24, 0.48]);
     h2("Key business stakeholders");
-    if (!c.businessStakeholders.length) para("—");
-    c.businessStakeholders.forEach((s) => entry(s.name, `${s.team} — ${s.projectRole}`));
+    drawTable(["Name", "Team", "Project role"], c.businessStakeholders.map((s) => [s.name, s.team, s.projectRole]), [0.28, 0.24, 0.48]);
 
     h2("Project milestones");
-    if (!c.milestones.length) para("—");
-    c.milestones.forEach((m) => entry(m.milestone, m.targetDate));
+    drawTable(["Milestone", "Target date"], c.milestones.map((m) => [m.milestone, m.targetDate]), [0.7, 0.3]);
 
     h2("In-scope epics");
-    if (!c.inScopeEpics.length) para("—");
-    c.inScopeEpics.forEach((e) => entry(`${e.name}${e.jiraId ? ` [${e.jiraId}]` : ""}`, e.scopeDetail));
+    drawTable(["Jira", "Epic name", "Scope detail"], c.inScopeEpics.map((e) => [e.jiraId || e.jiraUrl || "—", e.name, e.scopeDetail]), [0.16, 0.28, 0.56]);
 
     h2("Adoption support (markets)");
     para(c.adoptionMarkets.join(", "));
@@ -159,8 +196,7 @@ export function buildPlaybookPdf(d: PlaybookDocData): Promise<Buffer> {
     para(c.futureScope);
 
     h2("KPIs & measurement strategy");
-    if (!c.kpis.length) para("—");
-    c.kpis.forEach((k) => entry(k.metric, `Target: ${k.targetValue} · ${k.measurementStrategy}`));
+    drawTable(["KPI / metric", "Target value", "Measurement strategy"], c.kpis.map((k) => [k.metric, k.targetValue, k.measurementStrategy]), [0.3, 0.22, 0.48]);
 
     h2("Operational & change management");
     para(c.operationalChangeManagement);
