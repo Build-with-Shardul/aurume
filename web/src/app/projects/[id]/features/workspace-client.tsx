@@ -259,23 +259,27 @@ export default function PlaybookWorkspace({
                 )}
                 {playbook.edited && <span className="text-neutral-400">· human-edited</span>}
               </div>
-              {canWork && (
-                <div className="flex items-center gap-2">
-                  {!pbEditing && !approved && <button onClick={() => { setDraft(playbook.content); setPbEditing(true); }} className="rounded-md border border-neutral-300 px-3 py-1.5 text-xs hover:bg-neutral-50">Edit</button>}
-                  {pbEditing && (
-                    <>
-                      <button disabled={busy === "save"} onClick={() => draft && run("save", () => savePlaybookContent(playbook.id, draft), () => setPbEditing(false))} className="rounded-md bg-neutral-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-neutral-800 disabled:opacity-50">{busy === "save" ? "Saving…" : "Save"}</button>
-                      <button onClick={() => { setPbEditing(false); setDraft(null); }} className="text-xs text-neutral-500 hover:text-neutral-900">Cancel</button>
-                    </>
-                  )}
-                  {modelInfo.options.length > 0 && (
-                    <select value={model} onChange={(e) => setModel(e.target.value)} className="rounded-md border border-neutral-300 px-2 py-1 text-xs outline-none focus:border-neutral-900" title="Model for the next generation">
-                      {modelInfo.options.map((mo) => <option key={mo} value={mo}>{mo}</option>)}
-                    </select>
-                  )}
-                  <button disabled={busy === "gen"} onClick={() => run("gen", () => generateProductPlaybook(projectId, model))} className="rounded-md border border-neutral-300 px-3 py-1.5 text-xs hover:bg-neutral-50 disabled:opacity-50">{busy === "gen" ? "…" : playbook.stale ? "Update playbook" : "Regenerate"}</button>
-                </div>
-              )}
+              <div className="flex items-center gap-2">
+                <a href={`/api/projects/${projectId}/playbook/download?format=docx`} className="rounded-md border border-neutral-300 px-3 py-1.5 text-xs hover:bg-neutral-50" title="Download as Word (.docx) with approval status">⬇ Word</a>
+                <a href={`/api/projects/${projectId}/playbook/download?format=pdf`} className="rounded-md border border-neutral-300 px-3 py-1.5 text-xs hover:bg-neutral-50" title="Download as PDF with approval status">⬇ PDF</a>
+                {canWork && (
+                  <>
+                    {!pbEditing && !approved && <button onClick={() => { setDraft(playbook.content); setPbEditing(true); }} className="rounded-md border border-neutral-300 px-3 py-1.5 text-xs hover:bg-neutral-50">Edit</button>}
+                    {pbEditing && (
+                      <>
+                        <button disabled={busy === "save"} onClick={() => draft && run("save", () => savePlaybookContent(playbook.id, draft), () => setPbEditing(false))} className="rounded-md bg-neutral-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-neutral-800 disabled:opacity-50">{busy === "save" ? "Saving…" : "Save"}</button>
+                        <button onClick={() => { setPbEditing(false); setDraft(null); }} className="text-xs text-neutral-500 hover:text-neutral-900">Cancel</button>
+                      </>
+                    )}
+                    {modelInfo.options.length > 0 && (
+                      <select value={model} onChange={(e) => setModel(e.target.value)} className="rounded-md border border-neutral-300 px-2 py-1 text-xs outline-none focus:border-neutral-900" title="Model for the next generation">
+                        {modelInfo.options.map((mo) => <option key={mo} value={mo}>{mo}</option>)}
+                      </select>
+                    )}
+                    <button disabled={busy === "gen"} onClick={() => run("gen", () => generateProductPlaybook(projectId, model))} className="rounded-md border border-neutral-300 px-3 py-1.5 text-xs hover:bg-neutral-50 disabled:opacity-50">{busy === "gen" ? "…" : playbook.stale ? "Update playbook" : "Regenerate"}</button>
+                  </>
+                )}
+              </div>
             </div>
 
             {playbook.stale && <p className="rounded-lg border border-orange-200 bg-orange-50 px-3 py-2 text-xs text-orange-800">Features or knowledge changed since this version. Click <strong>Update playbook</strong> to regenerate.</p>}
