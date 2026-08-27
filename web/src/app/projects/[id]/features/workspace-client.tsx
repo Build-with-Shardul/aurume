@@ -47,6 +47,9 @@ export type PlaybookView = {
   approverId: string | null;
   approverName: string | null;
   canApprove: boolean;
+  promptTokens: number | null;
+  completionTokens: number | null;
+  costUsdMicros: number | null;
 };
 type Member = { userId: string; name: string | null; email: string; discipline: string | null };
 
@@ -231,6 +234,12 @@ export default function PlaybookWorkspace({
                 <span className={`rounded-full px-2 py-0.5 font-medium ${gTone}`}>{g}% grounded</span>
                 {playbook.stale && <span className="rounded-full bg-orange-100 px-2 py-0.5 font-medium text-orange-700">Out of date</span>}
                 {playbook.model && <span className="text-neutral-400">{playbook.provider}/{playbook.model}</span>}
+                {playbook.promptTokens != null && (
+                  <span className="text-neutral-400" title={`${playbook.promptTokens.toLocaleString()} in + ${(playbook.completionTokens ?? 0).toLocaleString()} out`}>
+                    · {((playbook.promptTokens ?? 0) + (playbook.completionTokens ?? 0)).toLocaleString()} tokens
+                    {playbook.costUsdMicros != null && ` · ~$${(playbook.costUsdMicros / 1e6).toFixed(3)}`}
+                  </span>
+                )}
                 {playbook.edited && <span className="text-neutral-400">· human-edited</span>}
               </div>
               {canWork && (

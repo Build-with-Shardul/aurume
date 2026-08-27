@@ -3,7 +3,7 @@ import Link from "next/link";
 import { desc, eq } from "drizzle-orm";
 import { getActiveMembership, canCreateProject, canManageOrg } from "@/lib/auth-server";
 import { db } from "@/lib/db";
-import { project, feature, playbook, member, user, projectCompliance } from "@/lib/db/schema";
+import { project, feature, playbook, member, user, projectCompliance, aiGeneration } from "@/lib/db/schema";
 import PlaybookWorkspace, { type PlaybookView } from "./workspace-client";
 
 export default async function FeaturesPage({ params }: { params: Promise<{ id: string }> }) {
@@ -26,6 +26,15 @@ export default async function FeaturesPage({ params }: { params: Promise<{ id: s
     .select({ key: projectCompliance.key, label: projectCompliance.label })
     .from(projectCompliance)
     .where(eq(projectCompliance.projectId, id));
+
+  const gen = pb
+    ? (await db
+        .select({ prompt: aiGeneration.promptTokens, completion: aiGeneration.completionTokens, cost: aiGeneration.costUsdMicros })
+        .from(aiGeneration)
+        .where(eq(aiGeneration.playbookId, pb.id))
+        .orderBy(desc(aiGeneration.createdAt))
+        .limit(1))[0] ?? null
+    : null;
 
   const members = await db
     .select({ userId: member.userId, name: user.name, email: user.email, discipline: member.discipline })
@@ -50,6 +59,9 @@ export default async function FeaturesPage({ params }: { params: Promise<{ id: s
         approverId: pb.approverId,
         approverName: pb.approverId ? members.find((x) => x.userId === pb.approverId)?.name ?? members.find((x) => x.userId === pb.approverId)?.email ?? null : null,
         canApprove: (pb.approverId ? pb.approverId === m.userId : canWork) || isOrgAdmin,
+        promptTokens: gen?.prompt ?? null,
+        completionTokens: gen?.completion ?? null,
+        costUsdMicros: gen?.cost ?? null,
       }
     : null;
 
