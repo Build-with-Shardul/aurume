@@ -77,6 +77,12 @@ export default function PlanClient({ plan, project, members, budget, timeline }:
   const utilPct = (m: Member) => { const cap = capacity(m); return cap ? Math.round(((hoursByUser.get(m.userId) ?? 0) / cap) * 100) : 0; };
   const utilTone = (p: number) => (p > 100 ? "bg-red-100 text-red-700" : p >= 60 ? "bg-green-100 text-green-700" : p > 0 ? "bg-amber-100 text-amber-700" : "bg-neutral-100 text-neutral-400");
 
+  // Global project utilization: total scheduled hours ÷ total team capacity over the window.
+  const totalCapacity = members.reduce((a, m) => a + capacity(m), 0);
+  const totalScheduledHours = plan.perAssignee.reduce((a, x) => a + x.hours, 0);
+  const globalUtil = totalCapacity ? Math.round((totalScheduledHours / totalCapacity) * 100) : 0;
+  const utilCardTone = totalCapacity === 0 ? "muted" : globalUtil > 100 ? "bad" : globalUtil >= 60 ? "ok" : "muted";
+
   function barsFor(userId: string) {
     return scheduled.filter((s) => s.assigneeId === userId).map((s) => ({ id: s.id, title: `${s.title}${s.points != null ? ` · ${s.points}pt` : ""}`, start: s.start!, end: s.end!, priority: s.priority, approved: s.status === "approved" }));
   }
@@ -109,9 +115,10 @@ export default function PlanClient({ plan, project, members, budget, timeline }:
   return (
     <div className="space-y-6">
       {/* verdict cards */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
         <Card title="Budget" tone={budget.unknown ? "muted" : budget.ok ? "ok" : "bad"} value={budget.unknown ? "—" : budget.ok ? "Within budget" : `Over by ${money(budget.delta)}`} sub={`Projected ${money(plan.totalCost)} · Budget ${money(project.budget)}`} />
         <Card title="Timeline" tone={timeline.unknown ? "muted" : timeline.ok ? "ok" : "bad"} value={timeline.unknown ? "—" : timeline.ok ? (timeline.days === 0 ? "On the deadline" : `${-timeline.days}d early`) : `Late by ${timeline.days}d`} sub={`Projected end ${plan.projectedEnd ?? "—"} · Expected ${project.endDate ?? "—"}`} />
+        <Card title="Utilization" tone={utilCardTone} value={totalCapacity ? `${globalUtil}%` : "—"} sub={`${totalScheduledHours.toLocaleString()}h of ${totalCapacity.toLocaleString()}h capacity · ${members.length} member${members.length === 1 ? "" : "s"}`} />
         <Card title="Work" tone="muted" value={`${plan.totalHours.toLocaleString()} h`} sub={`${plan.stories.reduce((a, s) => a + (s.points ?? 0), 0)} pts · ${plan.stories.length} stories · ${project.hoursPerPoint}h/pt`} />
       </div>
 
