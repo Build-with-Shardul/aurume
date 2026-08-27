@@ -218,6 +218,18 @@ export async function assignStory(storyId: string, assigneeId: string | null) {
   return { ok: true };
 }
 
+export async function setStoryDependencies(storyId: string, dependsOn: string[]) {
+  const ctx = await storyCtx(storyId);
+  if (!ctx?.canWork) return { error: "Not allowed." };
+  const cleaned = Array.from(new Set((dependsOn || []).filter((d) => d && d !== storyId)));
+  if (cleaned.length) {
+    const valid = new Set((await db.select({ id: story.id }).from(story).where(eq(story.projectId, ctx.story.projectId))).map((r) => r.id));
+    for (const d of cleaned) if (!valid.has(d)) return { error: "A dependency isn't in this project." };
+  }
+  await db.update(story).set({ dependsOn: cleaned, updatedAt: new Date() }).where(eq(story.id, storyId));
+  return { ok: true };
+}
+
 /** Manual schedule pin (hybrid). Pass both dates to pin, or both null to clear (back to auto). */
 export async function setStorySchedule(storyId: string, startDate: string | null, endDate: string | null) {
   const ctx = await storyCtx(storyId);

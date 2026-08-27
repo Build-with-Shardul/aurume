@@ -32,7 +32,7 @@ export default async function PlanPage({ params }: { params: Promise<{ id: strin
   const epicMeta = new Map(epics.map((e, i) => [e.id, { order: e.orderIndex ?? i, name: e.name }]));
 
   const rows = await db
-    .select({ id: story.id, epicId: story.epicId, title: story.title, points: story.points, priority: story.priority, status: story.status, assigneeId: story.assigneeId, startDate: story.startDate, endDate: story.endDate })
+    .select({ id: story.id, epicId: story.epicId, title: story.title, points: story.points, priority: story.priority, status: story.status, assigneeId: story.assigneeId, dependsOn: story.dependsOn, startDate: story.startDate, endDate: story.endDate })
     .from(story)
     .where(eq(story.projectId, id));
 
@@ -46,6 +46,7 @@ export default async function PlanPage({ params }: { params: Promise<{ id: strin
     priority: s.priority,
     status: s.status,
     assigneeId: s.assigneeId,
+    dependsOn: (s.dependsOn as string[]) ?? [],
     startDate: s.startDate,
     endDate: s.endDate,
   }));

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { updateEpic, deleteEpic, generateStories, updateStory, deleteStory, setStoryApproved, assignStory, setStorySchedule } from "../actions";
+import { updateEpic, deleteEpic, generateStories, updateStory, deleteStory, setStoryApproved, assignStory, setStorySchedule, setStoryDependencies } from "../actions";
 
 export type StoryView = {
   id: string;
@@ -16,11 +16,13 @@ export type StoryView = {
   sourceApproved: boolean;
   sourceVersion: string | null;
   assigneeId: string | null;
+  dependsOn: string[];
   startDate: string | null;
   endDate: string | null;
 };
 type Epic = { id: string; name: string; scopeDetail: string | null; jiraId: string | null; jiraUrl: string | null };
 type Member = { userId: string; name: string };
+type ProjectStory = { id: string; title: string };
 type ModelInfo = { provider: string; options: string[]; defaultModel: string };
 
 const field = "w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-neutral-900";
@@ -37,6 +39,7 @@ export default function EpicDetail({
   epic,
   stories,
   members,
+  projectStories,
   canWork,
   modelInfo,
   playbookApproved,
@@ -46,6 +49,7 @@ export default function EpicDetail({
   epic: Epic;
   stories: StoryView[];
   members: Member[];
+  projectStories: ProjectStory[];
   canWork: boolean;
   modelInfo: ModelInfo;
   playbookApproved: boolean;
@@ -72,6 +76,8 @@ export default function EpicDetail({
   const [sPts, setSPts] = useState("");
   const [sStart, setSStart] = useState("");
   const [sEnd, setSEnd] = useState("");
+  const [sDeps, setSDeps] = useState<string[]>([]);
+  const titleById = new Map(projectStories.map((p) => [p.id, p.title]));
 
   async function run(key: string, fn: () => Promise<{ error?: string } | void>, after?: () => void) {
     setErr("");
@@ -92,13 +98,16 @@ export default function EpicDetail({
     setSPts(s.points != null ? String(s.points) : "");
     setSStart(s.startDate ? s.startDate.slice(0, 10) : "");
     setSEnd(s.endDate ? s.endDate.slice(0, 10) : "");
+    setSDeps(s.dependsOn ?? []);
   }
 
   async function saveStory(id: string) {
     await run(`save-${id}`, async () => {
       const r1 = await updateStory(id, { title: sTitle, userStory: sStory, acceptanceCriteria: sAC.split("\n"), priority: sPri, points: sPts.trim() ? Math.round(Number(sPts)) : null });
       if (r1?.error) return r1;
-      return setStorySchedule(id, sStart || null, sEnd || null);
+      const r2 = await setStorySchedule(id, sStart || null, sEnd || null);
+      if (r2?.error) return r2;
+      return setStoryDependencies(id, sDeps);
     }, () => setEditId(""));
   }
 
@@ -185,6 +194,18 @@ export default function EpicDetail({
                     <input value={sStart} onChange={(e) => setSStart(e.target.value)} type="date" className={cell} title="Manual start (overrides auto-schedule)" />
                     <input value={sEnd} onChange={(e) => setSEnd(e.target.value)} type="date" className={cell} title="Manual end" />
                   </div>
+                  <div>
+                    <div className="mb-1 text-xs text-neutral-400">Depends on (blocks this story until they finish — cascades across assignees):</div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {projectStories.filter((ps) => ps.id !== s.id).map((ps) => {
+                        const on = sDeps.includes(ps.id);
+                        return (
+                          <button key={ps.id} type="button" onClick={() => setSDeps((d) => (on ? d.filter((x) => x !== ps.id) : [...d, ps.id]))} className={`rounded-md border px-2 py-1 text-xs ${on ? "border-neutral-900 bg-neutral-900 text-white" : "border-neutral-300 hover:bg-neutral-50"}`}>{ps.title}</button>
+                        );
+                      })}
+                      {projectStories.length <= 1 && <span className="text-xs text-neutral-400">No other stories to depend on yet.</span>}
+                    </div>
+                  </div>
                   <div className="flex gap-2">
                     <button disabled={busy === `save-${s.id}` || !sTitle.trim()} onClick={() => saveStory(s.id)} className="rounded-md bg-neutral-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-neutral-800 disabled:opacity-50">Save</button>
                     <button onClick={() => setEditId("")} className="text-xs text-neutral-500 hover:text-neutral-900">Cancel</button>
@@ -223,7 +244,8 @@ export default function EpicDetail({
                       </ul>
                     </div>
                   )}
-                  {s.citations.length > 0 && <div className="mt-2 text-[11px] text-neutral-400">cites {s.citations.join(", ")}</div>}
+                  {s.dependsOn.length > 0 && <div className="mt-2 text-[11px] text-indigo-600">⛓ depends on: {s.dependsOn.map((d) => titleById.get(d) ?? "?").join(", ")}</div>}
+                  {s.citations.length > 0 && <div className="mt-1 text-[11px] text-neutral-400">cites {s.citations.join(", ")}</div>}
                 </div>
               )}
             </div>

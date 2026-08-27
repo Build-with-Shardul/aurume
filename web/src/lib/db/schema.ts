@@ -462,6 +462,7 @@ export const story = pgTable(
     priority: text("priority"), // must | should | could | wont
     points: integer("points"),
     assigneeId: text("assignee_id").references(() => user.id, { onDelete: "set null" }), // a project member
+    dependsOn: jsonb("depends_on"), // string[] of story ids this story is blocked by (cross-assignee)
     startDate: date("start_date"), // manual override pin (hybrid scheduling); null = auto-scheduled
     endDate: date("end_date"),
     status: text("status").notNull().default("draft"), // draft | approved

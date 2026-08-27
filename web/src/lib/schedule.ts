@@ -14,6 +14,7 @@ export type PlanStoryInput = {
   priority: string | null;
   status: string;
   assigneeId: string | null;
+  dependsOn: string[]; // story ids this one is blocked by
   startDate: string | null; // manual pin
   endDate: string | null;
 };
@@ -133,32 +134,46 @@ export function computePlan(
     }
   }
 
-  // Auto-schedule the rest, per assignee.
+  // Dependency-aware auto-schedule: a story starts no earlier than its assignee is
+  // free AND all its dependencies have finished (cross-assignee), so a slip (e.g. a
+  // leave) cascades to dependents even under different people.
   const order = (a: PlanStoryInput, b: PlanStoryInput) =>
     a.epicOrder - b.epicOrder || (PRI_RANK[a.priority ?? "should"] ?? 1) - (PRI_RANK[b.priority ?? "should"] ?? 1) || a.title.localeCompare(b.title);
-  const autoByAssignee = new Map<string, PlanStoryInput[]>();
-  for (const s of stories) {
-    if (!s.assigneeId || s.points == null || s.points <= 0) continue; // unassigned/unpointed → not scheduled
-    if (s.startDate && s.endDate) continue; // pinned
-    const arr = autoByAssignee.get(s.assigneeId) ?? [];
-    arr.push(s);
-    autoByAssignee.set(s.assigneeId, arr);
-  }
-  for (const [assigneeId, arr] of autoByAssignee) {
+
+  const endOf = new Map<string, Date>(); // resolved end dates (pinned + scheduled)
+  for (const s of stories) if (s.startDate && s.endDate) endOf.set(s.id, parseISO(s.endDate));
+
+  const schedulable = stories.filter((s) => s.assigneeId && s.points != null && s.points > 0 && !(s.startDate && s.endDate));
+  const remaining = new Set(schedulable.map((s) => s.id));
+  const assigneeCursor = new Map<string, Date>();
+  const isReady = (s: PlanStoryInput) => (s.dependsOn ?? []).every((d) => !remaining.has(d)); // deps not still-pending
+
+  let guard = schedulable.length + 5;
+  while (remaining.size > 0 && guard-- > 0) {
+    const pending = schedulable.filter((s) => remaining.has(s.id));
+    const ready = pending.filter(isReady).sort(order);
+    const s = ready[0] ?? pending.sort(order)[0]; // cycle fallback: pick any, ignore unresolved deps
+    if (!s) break;
+
+    const assigneeId = s.assigneeId!;
     const mem = memberById.get(assigneeId);
     const perDay = Math.max(1, mem?.hoursPerDay ?? 8);
     const isOff = offFor(assigneeId);
-    arr.sort(order);
-    let cursor = nextAvailable(anchorRaw, isOff);
-    for (const s of arr) {
-      const sc = byId.get(s.id)!;
-      const days = Math.max(1, Math.ceil(sc.hours / perDay));
-      const start = cursor;
-      const end = addAvailableDays(start, days - 1, isOff);
-      sc.start = toISO(start);
-      sc.end = toISO(end);
-      cursor = nextAvailable(addDays(end, 1), isOff);
+    const sc = byId.get(s.id)!;
+
+    let earliest = assigneeCursor.get(assigneeId) ?? anchorRaw;
+    for (const d of s.dependsOn ?? []) {
+      const de = endOf.get(d);
+      if (de) { const after = addDays(de, 1); if (after.getTime() > earliest.getTime()) earliest = after; }
     }
+    const start = nextAvailable(earliest, isOff);
+    const days = Math.max(1, Math.ceil(sc.hours / perDay));
+    const end = addAvailableDays(start, days - 1, isOff);
+    sc.start = toISO(start);
+    sc.end = toISO(end);
+    endOf.set(s.id, end);
+    assigneeCursor.set(assigneeId, nextAvailable(addDays(end, 1), isOff));
+    remaining.delete(s.id);
   }
 
   // Roll-ups.

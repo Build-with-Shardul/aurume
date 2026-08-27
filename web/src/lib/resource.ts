@@ -63,13 +63,13 @@ export async function getResourceAllocation(orgId: string, userId: string): Prom
     const epics = await db.select({ id: epic.id, name: epic.name, orderIndex: epic.orderIndex }).from(epic).where(eq(epic.projectId, pr.projectId)).orderBy(asc(epic.orderIndex));
     const epicMeta = new Map(epics.map((e, i) => [e.id, { order: e.orderIndex ?? i, name: e.name }]));
     const rows = await db
-      .select({ id: story.id, epicId: story.epicId, title: story.title, points: story.points, priority: story.priority, status: story.status, assigneeId: story.assigneeId, startDate: story.startDate, endDate: story.endDate })
+      .select({ id: story.id, epicId: story.epicId, title: story.title, points: story.points, priority: story.priority, status: story.status, assigneeId: story.assigneeId, dependsOn: story.dependsOn, startDate: story.startDate, endDate: story.endDate })
       .from(story)
       .where(eq(story.projectId, pr.projectId));
 
     const planStories: PlanStoryInput[] = rows.map((s) => ({
       id: s.id, epicId: s.epicId, epicOrder: epicMeta.get(s.epicId)?.order ?? 0, epicName: epicMeta.get(s.epicId)?.name ?? "—",
-      title: s.title, points: s.points, priority: s.priority, status: s.status, assigneeId: s.assigneeId, startDate: s.startDate, endDate: s.endDate,
+      title: s.title, points: s.points, priority: s.priority, status: s.status, assigneeId: s.assigneeId, dependsOn: (s.dependsOn as string[]) ?? [], startDate: s.startDate, endDate: s.endDate,
     }));
     const plan = computePlan(
       { startDate: pr.startDate, endDate: pr.endDate, budget: pr.budget, hoursPerPoint: pr.hoursPerPoint },

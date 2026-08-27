@@ -8,6 +8,13 @@ schema, and behavior can change between pre-releases.
 ## [Unreleased]
 
 ### Added
+- **Story dependencies (cross-assignee cascade)** — a story can now depend on other
+  stories ("depends on" picker in the story editor, `story.dependsOn`). The scheduler
+  is dependency-aware: a story starts no earlier than its assignee is free AND all its
+  dependencies have finished — so a slip on one person's work (e.g. a leave) cascades
+  to dependents even when they're assigned to someone else. Topological greedy
+  scheduling with cycle-breaking. Verified: a leave-delayed story pushed a dependent
+  story (different assignee) later and moved the whole project end.
 - **Leaves + Resources (cross-project)** — resources and time off.
   - **Leave/time off** is stored per person org-wide (`leave` table); the scheduler
     now skips a person's leave days (and they reduce capacity), so adding leave —

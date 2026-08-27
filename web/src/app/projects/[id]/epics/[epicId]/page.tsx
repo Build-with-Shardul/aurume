@@ -25,6 +25,8 @@ export default async function EpicPage({ params }: { params: Promise<{ id: strin
     .innerJoin(user, eq(user.id, projectMember.userId))
     .where(eq(projectMember.projectId, id))).map((mm) => ({ userId: mm.userId, name: mm.name || mm.email }));
 
+  const projectStories = await db.select({ id: story.id, title: story.title }).from(story).where(eq(story.projectId, id));
+
   const rows = await db.select().from(story).where(eq(story.epicId, epicId)).orderBy(asc(story.createdAt));
   const stories: StoryView[] = rows.map((s) => ({
     id: s.id,
@@ -38,6 +40,7 @@ export default async function EpicPage({ params }: { params: Promise<{ id: strin
     sourceApproved: s.sourceApproved,
     sourceVersion: s.sourceVersion,
     assigneeId: s.assigneeId,
+    dependsOn: (s.dependsOn as string[]) ?? [],
     startDate: s.startDate,
     endDate: s.endDate,
   }));
@@ -62,6 +65,7 @@ export default async function EpicPage({ params }: { params: Promise<{ id: strin
             epic={{ id: e.id, name: e.name, scopeDetail: e.scopeDetail, jiraId: e.jiraId, jiraUrl: e.jiraUrl }}
             stories={stories}
             members={members}
+            projectStories={projectStories}
             canWork={canWork}
             modelInfo={modelInfo}
             playbookApproved={pb?.status === "approved"}
