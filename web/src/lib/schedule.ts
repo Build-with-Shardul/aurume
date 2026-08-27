@@ -65,20 +65,35 @@ function addDays(d: Date, n: number): Date {
   r.setUTCDate(r.getUTCDate() + n);
   return r;
 }
-function nextWorkingDay(d: Date): Date {
+/** First day at/after d that isn't "off" (weekend or leave). */
+function nextAvailable(d: Date, isOff: (x: Date) => boolean): Date {
   let r = new Date(d);
-  while (isWeekend(r)) r = addDays(r, 1);
+  while (isOff(r)) r = addDays(r, 1);
   return r;
 }
-/** Advance n working days from a working day d (n>=0; n=0 returns d). */
-function addWorkingDays(d: Date, n: number): Date {
+/** Advance n available days from an available day d (n>=0; n=0 returns d). */
+function addAvailableDays(d: Date, n: number, isOff: (x: Date) => boolean): Date {
   let r = new Date(d);
   let left = n;
   while (left > 0) {
     r = addDays(r, 1);
-    if (!isWeekend(r)) left--;
+    if (!isOff(r)) left--;
   }
   return r;
+}
+/** Expand leave ranges for a user into a Set of ISO day strings. */
+function leaveSetFor(leaves: Array<{ userId: string; start: string; end: string }>, userId: string): Set<string> {
+  const set = new Set<string>();
+  for (const l of leaves) {
+    if (l.userId !== userId) continue;
+    let d = parseISO(l.start);
+    const end = parseISO(l.end);
+    while (d.getTime() <= end.getTime()) {
+      set.add(toISO(d));
+      d = addDays(d, 1);
+    }
+  }
+  return set;
 }
 /** Inclusive count of calendar days between two ISO dates (b - a). */
 function dayDiff(aISO: string, bISO: string): number {
@@ -89,10 +104,13 @@ export function computePlan(
   project: { startDate: string | null; endDate: string | null; budget: number | null; hoursPerPoint: number },
   members: PlanMember[],
   stories: PlanStoryInput[],
+  leaves: Array<{ userId: string; start: string; end: string }> = [],
 ): Plan {
   const hpp = project.hoursPerPoint || 8;
   const memberById = new Map(members.map((m) => [m.userId, m]));
-  const anchor = nextWorkingDay(project.startDate ? parseISO(project.startDate) : new Date(`${new Date().toISOString().slice(0, 10)}T00:00:00Z`));
+  const leaveSets = new Map(members.map((m) => [m.userId, leaveSetFor(leaves, m.userId)]));
+  const offFor = (userId: string) => (x: Date) => isWeekend(x) || (leaveSets.get(userId)?.has(toISO(x)) ?? false);
+  const anchorRaw = project.startDate ? parseISO(project.startDate) : new Date(`${new Date().toISOString().slice(0, 10)}T00:00:00Z`);
 
   const scheduled: ScheduledStory[] = stories.map((s) => {
     const mem = s.assigneeId ? memberById.get(s.assigneeId) ?? null : null;
@@ -129,16 +147,17 @@ export function computePlan(
   for (const [assigneeId, arr] of autoByAssignee) {
     const mem = memberById.get(assigneeId);
     const perDay = Math.max(1, mem?.hoursPerDay ?? 8);
+    const isOff = offFor(assigneeId);
     arr.sort(order);
-    let cursor = nextWorkingDay(anchor);
+    let cursor = nextAvailable(anchorRaw, isOff);
     for (const s of arr) {
       const sc = byId.get(s.id)!;
       const days = Math.max(1, Math.ceil(sc.hours / perDay));
       const start = cursor;
-      const end = addWorkingDays(start, days - 1);
+      const end = addAvailableDays(start, days - 1, isOff);
       sc.start = toISO(start);
       sc.end = toISO(end);
-      cursor = nextWorkingDay(addDays(end, 1));
+      cursor = nextAvailable(addDays(end, 1), isOff);
     }
   }
 

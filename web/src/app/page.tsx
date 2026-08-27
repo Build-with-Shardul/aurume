@@ -91,6 +91,14 @@ export default async function Home() {
               )}
               {canManage && (
                 <Link
+                  href="/resources"
+                  className="inline-block rounded-lg border border-neutral-300 px-4 py-2 text-sm font-medium text-neutral-800 hover:bg-neutral-50"
+                >
+                  Resources
+                </Link>
+              )}
+              {canManage && (
+                <Link
                   href="/usage"
                   className="inline-block rounded-lg border border-neutral-300 px-4 py-2 text-sm font-medium text-neutral-800 hover:bg-neutral-50"
                 >

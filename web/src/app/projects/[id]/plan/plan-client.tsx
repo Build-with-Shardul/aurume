@@ -9,6 +9,7 @@ type BV = Verdict & { delta: number };
 type TV = Verdict & { days: number };
 type Proj = { budget: number | null; currency: string; startDate: string | null; endDate: string | null; hoursPerPoint: number };
 type Member = { userId: string; name: string; role: string; hoursPerDay: number };
+type Leave = { userId: string; start: string; end: string; type: string };
 
 const PRI_BAR: Record<string, string> = { must: "bg-red-400", should: "bg-amber-400", could: "bg-blue-400", wont: "bg-neutral-400" };
 const DAY_W = 32;
@@ -50,7 +51,7 @@ function spans<T>(cols: Col[], key: (c: Col) => string, label: (c: Col) => strin
   return out;
 }
 
-export default function PlanClient({ plan, project, members, budget, timeline }: { plan: Plan; project: Proj; members: Member[]; budget: BV; timeline: TV }) {
+export default function PlanClient({ plan, project, members, leaves, budget, timeline }: { plan: Plan; project: Proj; members: Member[]; leaves: Leave[]; budget: BV; timeline: TV }) {
   const [view, setView] = useState<"role" | "epic">("role");
   const cur = project.currency;
   const money = (n: number | null) => (n == null ? "—" : formatBudget(Math.round(n), cur));
@@ -73,7 +74,21 @@ export default function PlanClient({ plan, project, members, budget, timeline }:
   const expectedLeft = expectedInRange ? (idxOfStart(project.endDate!) * DAY_W) : null;
 
   const hoursByUser = new Map(plan.perAssignee.map((a) => [a.userId, a.hours]));
-  const capacity = (m: Member) => cols.length * m.hoursPerDay;
+  // leave days per user within the chart window (working days only)
+  const colSet = new Set(cols.map((c) => c.iso));
+  const leaveDays = (userId: string) => {
+    const days = new Set<string>();
+    for (const l of leaves) {
+      if (l.userId !== userId) continue;
+      let d = parseISO(l.start);
+      const end = parseISO(l.end);
+      while (d.getTime() <= end.getTime()) { const iso = toISO(d); if (colSet.has(iso)) days.add(iso); d = new Date(d); d.setUTCDate(d.getUTCDate() + 1); }
+    }
+    return days;
+  };
+  const leaveRangesFor = (userId: string) =>
+    leaves.filter((l) => l.userId === userId && l.end >= rangeStart && l.start <= rangeEnd).map((l) => ({ id: `${l.userId}-${l.start}`, start: l.start < rangeStart ? rangeStart : l.start, end: l.end > rangeEnd ? rangeEnd : l.end, type: l.type }));
+  const capacity = (m: Member) => Math.max(0, cols.length - leaveDays(m.userId).size) * m.hoursPerDay;
   const utilPct = (m: Member) => { const cap = capacity(m); return cap ? Math.round(((hoursByUser.get(m.userId) ?? 0) / cap) * 100) : 0; };
   const utilTone = (p: number) => (p > 100 ? "bg-red-100 text-red-700" : p >= 60 ? "bg-green-100 text-green-700" : p > 0 ? "bg-amber-100 text-amber-700" : "bg-neutral-100 text-neutral-400");
 
@@ -91,13 +106,23 @@ export default function PlanClient({ plan, project, members, budget, timeline }:
   const roleGroups = new Map<string, Member[]>();
   for (const m of members) { const arr = roleGroups.get(m.role) ?? []; arr.push(m); roleGroups.set(m.role, arr); }
 
-  function Track({ bars }: { bars: { id: string; title: string; start: string; end: string; priority: string | null; approved: boolean }[] }) {
+  function Track({ bars, leaveBars = [] }: { bars: { id: string; title: string; start: string; end: string; priority: string | null; approved: boolean }[]; leaveBars?: { id: string; start: string; end: string; type: string }[] }) {
     return (
       <div className="relative h-7" style={{ width: gridW }}>
         {/* day gridlines */}
         {cols.map((c, i) => (
           <div key={c.iso} className={`absolute inset-y-0 border-l ${c.dom === 1 || i === 0 ? "border-neutral-300" : "border-neutral-100"}`} style={{ left: i * DAY_W, width: DAY_W }} />
         ))}
+        {/* leave/PTO bars (behind tasks) */}
+        {leaveBars.map((lb) => {
+          const l = idxOfStart(lb.start) * DAY_W;
+          const w = (idxOfEnd(lb.end) - idxOfStart(lb.start) + 1) * DAY_W;
+          return (
+            <div key={lb.id} className="absolute inset-y-0.5 z-[5] flex items-center overflow-hidden rounded px-1 text-[9px] text-neutral-600" style={{ left: l + 1, width: Math.max(DAY_W - 2, w - 2), backgroundImage: "repeating-linear-gradient(45deg,#e5e7eb,#e5e7eb 4px,#f3f4f6 4px,#f3f4f6 8px)" }} title={`${lb.type} ${lb.start} → ${lb.end}`}>
+              <span className="truncate uppercase tracking-wide">{lb.type}</span>
+            </div>
+          );
+        })}
         {expectedLeft != null && <div className="absolute inset-y-0 z-10 w-px bg-red-400" style={{ left: expectedLeft }} title={`Expected end ${project.endDate}`} />}
         {bars.map((b) => {
           const l = idxOfStart(b.start) * DAY_W;
@@ -177,7 +202,7 @@ export default function PlanClient({ plan, project, members, budget, timeline }:
                                 <span className="truncate text-xs font-medium text-neutral-800" title={m.name}>{m.name}</span>
                                 <span className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium ${utilTone(u)}`}>{u}%</span>
                               </div>
-                              <Track bars={barsFor(m.userId)} />
+                              <Track bars={barsFor(m.userId)} leaveBars={leaveRangesFor(m.userId)} />
                             </div>
                           );
                         })}

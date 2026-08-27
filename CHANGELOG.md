@@ -8,6 +8,17 @@ schema, and behavior can change between pre-releases.
 ## [Unreleased]
 
 ### Added
+- **Leaves + Resources (cross-project)** — resources and time off.
+  - **Leave/time off** is stored per person org-wide (`leave` table); the scheduler
+    now skips a person's leave days (and they reduce capacity), so adding leave —
+    or reassigning a story or changing points — reshuffles the plan automatically.
+    Leave shows as a striped bar on the Gantt.
+  - **Resources admin** (`/resources`, owner/admin): a directory of everyone with
+    their projects and leave count; each resource opens a cross-project view —
+    project assignments (hours/cost/window), a calendar across all their projects
+    (each project scheduled independently, overlaid), monthly allocation (hours per
+    project per month), and leave management (add/remove). Linked from the dashboard.
+    New table: `leave`.
 - **Plan & schedule (budget + timeline + Gantt)** — turns points into a checkable plan.
   A project sets **1 story point = N hours** (1/2/3/8 or custom, at creation and in
   settings); each member has an **hours/day capacity**; stories get an **assignee**

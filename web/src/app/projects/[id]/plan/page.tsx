@@ -1,9 +1,9 @@
 import { redirect, notFound } from "next/navigation";
 import Link from "next/link";
-import { asc, eq } from "drizzle-orm";
+import { and, asc, eq, inArray } from "drizzle-orm";
 import { getActiveMembership } from "@/lib/auth-server";
 import { db } from "@/lib/db";
-import { project, projectMember, member, epic, story, user } from "@/lib/db/schema";
+import { project, projectMember, member, epic, story, user, leave } from "@/lib/db/schema";
 import { computePlan, budgetVerdict, timelineVerdict, type PlanStoryInput } from "@/lib/schedule";
 import { DISCIPLINE_LABEL } from "@/lib/permissions";
 import PlanClient from "./plan-client";
@@ -50,10 +50,17 @@ export default async function PlanPage({ params }: { params: Promise<{ id: strin
     endDate: s.endDate,
   }));
 
+  const memberIds = members.map((mm) => mm.userId);
+  const leaveRows = memberIds.length
+    ? await db.select({ userId: leave.userId, start: leave.startDate, end: leave.endDate, type: leave.type }).from(leave).where(and(eq(leave.organizationId, m.orgId!), inArray(leave.userId, memberIds)))
+    : [];
+  const leaves = leaveRows.map((l) => ({ userId: l.userId, start: l.start, end: l.end, type: l.type }));
+
   const plan = computePlan(
     { startDate: p.startDate, endDate: p.endDate, budget: p.budget, hoursPerPoint: p.hoursPerPoint },
     members.map((mm) => ({ userId: mm.userId, name: mm.name, rate: mm.rate, hoursPerDay: mm.hoursPerDay })),
     planStories,
+    leaves.map((l) => ({ userId: l.userId, start: l.start, end: l.end })),
   );
   const bv = budgetVerdict(plan, p.budget);
   const tv = timelineVerdict(plan, p.endDate);
@@ -78,6 +85,7 @@ export default async function PlanPage({ params }: { params: Promise<{ id: strin
             plan={plan}
             project={{ budget: p.budget, currency: p.currency, startDate: p.startDate, endDate: p.endDate, hoursPerPoint: p.hoursPerPoint }}
             members={members.map((mm) => ({ userId: mm.userId, name: mm.name, role: mm.role, hoursPerDay: mm.hoursPerDay }))}
+            leaves={leaves}
             budget={bv}
             timeline={tv}
           />

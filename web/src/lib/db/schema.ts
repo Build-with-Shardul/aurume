@@ -272,6 +272,28 @@ export const projectMember = pgTable(
   ],
 );
 
+// Time off for a resource (org member), applied across ALL their projects: the
+// scheduler skips these days and they reduce the person's capacity.
+export const leave = pgTable(
+  "leave",
+  {
+    id: text("id").primaryKey(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    startDate: date("start_date").notNull(),
+    endDate: date("end_date").notNull(),
+    type: text("type").notNull().default("leave"), // leave | pto | holiday
+    note: text("note"),
+    createdBy: text("created_by").references(() => user.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => [index("leave_user_idx").on(t.userId), index("leave_org_idx").on(t.organizationId)],
+);
+
 // A project's knowledge space: uploaded files + notes + (later) synced Slack/Teams
 // messages. `content` holds extractable text the AI can reference; `storageKey`
 // points at the blob in the storage backend for file items.
