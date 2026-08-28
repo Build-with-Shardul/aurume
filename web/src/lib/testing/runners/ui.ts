@@ -44,8 +44,11 @@ export class UiRunner implements TestRunner {
     const { chromium } = await import("playwright-core");
     try {
       session = await createSession(apiKey, projectId);
+      // Replay works AFTER the run (the session page in the Browserbase dashboard).
+      artifacts.push({ kind: "report", url: `https://www.browserbase.com/sessions/${session.id}`, note: "Session replay (review after the run)" });
+      // Live devtools view — only connected WHILE the session runs (disconnects at end).
       const live = await getLiveViewUrl(apiKey, session.id);
-      if (live) artifacts.push({ kind: "report", url: live, note: "Live view / replay" });
+      if (live) artifacts.push({ kind: "report", url: live, note: "Live view (only while running)" });
 
       browser = await chromium.connectOverCDP(session.connectUrl);
       const context = browser.contexts()[0] ?? (await browser.newContext());
