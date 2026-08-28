@@ -18,6 +18,18 @@ function stepLine(raw: string, index: number): string {
   return `    ${index === 0 ? "When" : "And"} ${s}`;
 }
 
+export type CaseForGherkin = { title: string; preconditions?: string | null; steps: string[] };
+
+/** Render a test case as a .feature — the executable input the engine runs. */
+export function caseToFeature(c: CaseForGherkin): string {
+  const lines: string[] = [`Feature: ${c.title}`, "", `  Scenario: ${c.title}`];
+  if (c.preconditions?.trim()) lines.push(`    # Precondition: ${c.preconditions.trim()}`);
+  const steps = c.steps.map(stepLine).filter(Boolean);
+  lines.push(...(steps.length ? steps : ["    Given no steps were provided"]));
+  lines.push("");
+  return lines.join("\n");
+}
+
 /** Render one scenario from a story's acceptance criteria. */
 export function storyToFeature(story: StoryForGherkin): string {
   const lines: string[] = [];

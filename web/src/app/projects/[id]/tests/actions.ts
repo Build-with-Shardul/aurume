@@ -3,9 +3,11 @@
 import { and, asc, desc, eq } from "drizzle-orm";
 import { getActiveMembership, canCreateProject, canManageOrg } from "@/lib/auth-server";
 import { db } from "@/lib/db";
-import { project, epic, story, techDoc, projectCompliance, testPlan, testPlanApprover, testCase, aiGeneration, member } from "@/lib/db/schema";
+import { project, epic, story, techDoc, projectCompliance, testPlan, testPlanApprover, testCase, testRun, aiGeneration, member } from "@/lib/db/schema";
 import { generateTestCasesForStories } from "@/lib/ai/generate";
 import { LLMConfigError } from "@/lib/ai/provider";
+import { getTestRunner, runnerForCategory, caseToFeature } from "@/lib/testing";
+import type { TestRunResult } from "@/lib/testing";
 
 type TddContent = { architectureOverview?: string; apis?: Array<{ method: string; path: string; purpose: string }>; securityPrivacy?: string };
 
@@ -351,4 +353,85 @@ export async function approveTestPlan(planId: string) {
   }
   await db.update(aiGeneration).set({ outcome: ctx.plan.edited ? "edited" : "approved" }).where(and(eq(aiGeneration.playbookId, planId), eq(aiGeneration.outcome, "generated")));
   return { ok: true };
+}
+
+// ---- execution (Phase 1: API runner) ----
+
+type RunOpts = { baseUrl?: string; bearer?: string; model?: string };
+
+async function persistRun(opts: { orgId: string; projectId: string; testCaseId: string; planId: string | null; runner: string; suite: string | null; baseUrl: string | null; result: TestRunResult; userId: string }) {
+  const id = crypto.randomUUID();
+  await db.insert(testRun).values({
+    id,
+    organizationId: opts.orgId,
+    projectId: opts.projectId,
+    testCaseId: opts.testCaseId,
+    testPlanId: opts.planId,
+    runner: opts.runner,
+    suite: opts.suite,
+    status: opts.result.status,
+    baseUrl: opts.baseUrl,
+    steps: opts.result.steps,
+    artifacts: opts.result.artifacts,
+    logs: opts.result.logs ?? null,
+    error: opts.result.error ?? null,
+    durationMs: opts.result.durationMs ?? null,
+    triggeredBy: opts.userId,
+    finishedAt: new Date(),
+  });
+  return id;
+}
+
+export async function runTestCase(caseId: string, opts: RunOpts = {}) {
+  const ctx = await caseCtx(caseId);
+  if (!ctx) return { error: "Not allowed." };
+  if (!ctx.canWork) return { error: "You don't have permission to run tests." };
+  const tc = ctx.testCase;
+
+  const runnerId = runnerForCategory(tc.category);
+  if (!runnerId) return { error: `${tc.category} cases aren't executable here yet — the browser (UI) engine and specialist perf/security runners come later. Only API cases run in Phase 1.` };
+
+  const feature = caseToFeature({ title: tc.title, preconditions: tc.preconditions, steps: (tc.steps as string[]) ?? [] });
+  const runner = getTestRunner(runnerId, { orgId: ctx.m.orgId!, model: opts.model });
+
+  let result: TestRunResult;
+  try {
+    result = await runner.run(
+      { id: tc.id, title: tc.title, feature, baseUrl: opts.baseUrl },
+      { baseUrl: opts.baseUrl, auth: opts.bearer ? { bearer: opts.bearer } : undefined },
+    );
+  } catch (e) {
+    if (e instanceof LLMConfigError) return { error: e.message };
+    return { error: e instanceof Error ? e.message : "Run failed." };
+  }
+
+  const runId = await persistRun({ orgId: ctx.m.orgId!, projectId: tc.projectId, testCaseId: tc.id, planId: tc.testPlanId, runner: runnerId, suite: null, baseUrl: opts.baseUrl ?? null, result, userId: ctx.m.userId });
+  return { ok: true, runId, result };
+}
+
+/** Run every API case in a suite (sequential). Returns per-case verdicts. */
+export async function runApiSuite(projectId: string, suite: string, opts: RunOpts = {}) {
+  const ctx = await loadProjectCtx(projectId);
+  if (!ctx?.canWork) return { error: "Not allowed." };
+  const plan = await latestPlan(projectId);
+  if (!plan) return { error: "No test plan yet." };
+
+  const cases = (await db.select().from(testCase).where(and(eq(testCase.testPlanId, plan.id), eq(testCase.category, "api"))))
+    .filter((c) => (suite === "all" ? true : ((c.suites as string[]) ?? []).includes(suite)));
+  if (!cases.length) return { error: `No API cases in the ${suite} suite.` };
+
+  const results: Array<{ caseId: string; title: string; status: string }> = [];
+  for (const tc of cases) {
+    const feature = caseToFeature({ title: tc.title, preconditions: tc.preconditions, steps: (tc.steps as string[]) ?? [] });
+    const runner = getTestRunner("api", { orgId: ctx.m.orgId!, model: opts.model });
+    let result: TestRunResult;
+    try {
+      result = await runner.run({ id: tc.id, title: tc.title, feature, baseUrl: opts.baseUrl }, { baseUrl: opts.baseUrl, auth: opts.bearer ? { bearer: opts.bearer } : undefined });
+    } catch (e) {
+      result = { runner: "api", status: "error", steps: [], artifacts: [], error: e instanceof Error ? e.message : String(e) };
+    }
+    await persistRun({ orgId: ctx.m.orgId!, projectId, testCaseId: tc.id, planId: plan.id, runner: "api", suite, baseUrl: opts.baseUrl ?? null, result, userId: ctx.m.userId });
+    results.push({ caseId: tc.id, title: tc.title, status: result.status });
+  }
+  return { ok: true, results };
 }

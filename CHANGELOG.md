@@ -8,6 +8,18 @@ schema, and behavior can change between pre-releases.
 ## [Unreleased]
 
 ### Added
+- **Testing engine — pluggable runner + API executor (Phase 0/1)** — the execution
+  side of the delivery chain, closing requirement → test → verdict. A license-neutral
+  **`TestRunner` seam** (`lib/testing`: interface + registry + story/case→Gherkin
+  exporter) so the execution backend is a config-swap, not a rewrite. Ships the
+  **API runner**: the model turns a test case's Gherkin into a concrete HTTP plan
+  (method/path/headers/body + assertions), which the runner executes with `fetch` and
+  checks deterministically (status / json-path / body / header). A **Run** button on
+  API cases (base URL + optional bearer token), inline per-step results, a last-run
+  badge, and persisted **`test_run`** rows (lineage: story → case → run → verdict).
+  Permissive/own engine (no AGPL) — the UI (browser) runner lands next behind the same
+  interface. New table: `test_run`. Verified: a real API case ran green against a live
+  API (all assertions passed), and mismatched endpoints correctly report failed.
 - **Test Cases (AI test-case corpus + coverage)** — the story-to-tests link, a
   first-class artifact like the Playbook/TDD (`/projects/[id]/tests`, card below
   Epics). AI-generates comprehensive cases across **happy path, edge, negative, API,

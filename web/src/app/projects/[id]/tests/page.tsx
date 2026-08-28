@@ -3,7 +3,7 @@ import Link from "next/link";
 import { and, asc, desc, eq } from "drizzle-orm";
 import { getActiveMembership, canCreateProject } from "@/lib/auth-server";
 import { db } from "@/lib/db";
-import { project, epic, story, testPlan, testPlanApprover, testCase, aiGeneration, member, user } from "@/lib/db/schema";
+import { project, epic, story, testPlan, testPlanApprover, testCase, testRun, aiGeneration, member, user } from "@/lib/db/schema";
 import { currentProvider, MODEL_OPTIONS, defaultModel } from "@/lib/ai/provider";
 import TestsWorkspace, { type TestCaseView, type TestPlanView, type StoryCoverage } from "./tests-client";
 
@@ -88,6 +88,13 @@ export default async function TestsPage({ params }: { params: Promise<{ id: stri
       }
     : null;
 
+  // latest run status per case
+  const runs = plan
+    ? await db.select({ testCaseId: testRun.testCaseId, status: testRun.status }).from(testRun).where(eq(testRun.testPlanId, plan.id)).orderBy(desc(testRun.createdAt))
+    : [];
+  const lastRun = new Map<string, string>();
+  for (const r of runs) if (r.testCaseId && !lastRun.has(r.testCaseId)) lastRun.set(r.testCaseId, r.status);
+
   const caseViews: TestCaseView[] = cases.map((c) => ({
     id: c.id,
     epicId: c.epicId,
@@ -100,6 +107,7 @@ export default async function TestsPage({ params }: { params: Promise<{ id: stri
     expectedResult: c.expectedResult,
     suites: (c.suites as string[]) ?? [],
     status: c.status,
+    lastRunStatus: lastRun.get(c.id) ?? null,
   }));
 
   const epicList = epics.map((e) => ({ id: e.id, name: e.name }));

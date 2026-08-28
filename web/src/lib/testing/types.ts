@@ -37,9 +37,12 @@ export type TestCase = {
   testData?: Record<string, unknown>;
 };
 
+export type RunAuth = { bearer?: string; headers?: Array<{ name: string; value: string }> };
+
 export type RunOptions = {
   model?: string; // BYO-key model the engine should use
   baseUrl?: string; // overrides TestCase.baseUrl
+  auth?: RunAuth; // credentials injected into requests
   timeoutMs?: number;
   signal?: AbortSignal;
 };

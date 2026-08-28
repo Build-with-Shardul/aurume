@@ -546,6 +546,37 @@ export const testCase = pgTable(
   (t) => [index("test_case_plan_idx").on(t.testPlanId), index("test_case_story_idx").on(t.storyId)],
 );
 
+// A Test Run — the execution of a test case by a runner (api now; ui via the browser
+// engine later). Closes the lineage: requirement (story) → test case → run → verdict.
+export const testRun = pgTable(
+  "test_run",
+  {
+    id: text("id").primaryKey(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    projectId: text("project_id")
+      .notNull()
+      .references(() => project.id, { onDelete: "cascade" }),
+    testCaseId: text("test_case_id").references(() => testCase.id, { onDelete: "set null" }),
+    testPlanId: text("test_plan_id"),
+    batchId: text("batch_id"), // groups a suite run
+    runner: text("runner").notNull(), // manual | api | ui
+    suite: text("suite"), // the suite selection that triggered it, if any
+    status: text("status").notNull().default("queued"), // queued | running | passed | failed | error | skipped
+    baseUrl: text("base_url"),
+    steps: jsonb("steps").notNull().default([]), // [{ text, status, detail }]
+    artifacts: jsonb("artifacts").notNull().default([]), // [{ kind, note, url, path }]
+    logs: text("logs"),
+    error: text("error"),
+    durationMs: integer("duration_ms"),
+    triggeredBy: text("triggered_by").references(() => user.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    finishedAt: timestamp("finished_at"),
+  },
+  (t) => [index("test_run_case_idx").on(t.testCaseId), index("test_run_project_idx").on(t.projectId)],
+);
+
 // An Epic — the next link in the delivery chain, promoted from a playbook's
 // in-scope epics (or added manually). Lineage: sourcePlaybookId + sourceVersion.
 export const epic = pgTable(

@@ -11,7 +11,9 @@ import {
   deleteTestCase,
   setTestPlanApprovers,
   approveTestPlan,
+  runTestCase,
 } from "./actions";
+import type { TestRunResult } from "@/lib/testing";
 
 export type TestPlanView = {
   id: string;
@@ -38,6 +40,7 @@ export type TestCaseView = {
   expectedResult: string | null;
   suites: string[];
   status: string;
+  lastRunStatus: string | null;
 };
 export type StoryCoverage = { storyId: string; title: string; epicName: string; caseCount: number; covered: boolean };
 
@@ -53,6 +56,9 @@ const SUITES = ["smoke", "sanity", "regression", "e2e"];
 const PRIORITIES = ["high", "medium", "low"];
 const money = (micros: number | null) => (micros == null ? "—" : `$${(micros / 1e6).toFixed(4)}`);
 const priTone = (p: string) => (p === "high" ? "bg-red-100 text-red-700" : p === "medium" ? "bg-amber-100 text-amber-700" : "bg-neutral-100 text-neutral-500");
+const runTone = (s: string) => (s === "passed" ? "bg-green-100 text-green-700" : s === "failed" || s === "error" ? "bg-red-100 text-red-700" : "bg-neutral-100 text-neutral-500");
+const runText = (s: string) => (s === "passed" ? "text-green-600" : s === "failed" || s === "error" ? "text-red-600" : "text-neutral-500");
+const runMark = (s: string) => (s === "passed" ? "✓" : s === "failed" ? "✗" : s === "error" ? "!" : "–");
 
 export default function TestsWorkspace({
   projectId, plan, cases, coverage, epics, stories, members, canWork, meId, modelInfo, generationLog,
@@ -77,6 +83,8 @@ export default function TestsWorkspace({
   const [suiteFilter, setSuiteFilter] = useState<string>("all");
   const [catFilter, setCatFilter] = useState<string>("all");
   const [showApprovers, setShowApprovers] = useState(false);
+  const [baseUrl, setBaseUrl] = useState("");
+  const [bearer, setBearer] = useState("");
 
   async function run<T>(key: string, fn: () => Promise<T & { error?: string }>) {
     setBusy(key); setError(null);
@@ -221,6 +229,14 @@ export default function TestsWorkspace({
         <span className="text-neutral-400">· {visible.length} shown</span>
       </div>
 
+      {/* run settings (Phase 1: API runner) */}
+      <div className="flex flex-wrap items-center gap-2 rounded-xl border border-neutral-200 bg-white px-4 py-2.5 text-xs">
+        <span className="font-medium text-neutral-600">Run API cases against:</span>
+        <input value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} placeholder="Base URL — https://api.example.com" className="w-64 rounded border border-neutral-300 px-2 py-1" />
+        <input value={bearer} onChange={(e) => setBearer(e.target.value)} placeholder="Bearer token (optional)" type="password" className="w-48 rounded border border-neutral-300 px-2 py-1" />
+        <span className="text-neutral-400">API cases execute here; UI cases need the browser engine (Phase 2).</span>
+      </div>
+
       {/* cases by category */}
       {CATEGORIES.map(([cat, label]) => {
         const rows = visible.filter((c) => c.category === cat);
@@ -232,7 +248,7 @@ export default function TestsWorkspace({
               <span className="text-xs text-neutral-400">{rows.length}</span>
             </div>
             <div className="divide-y divide-neutral-100">
-              {rows.map((c) => <CaseRow key={c.id} c={c} canWork={canWork} storyTitle={stories.find((s) => s.id === c.storyId)?.title} run={run} busy={busy} />)}
+              {rows.map((c) => <CaseRow key={c.id} c={c} canWork={canWork} storyTitle={stories.find((s) => s.id === c.storyId)?.title} run={run} busy={busy} runCfg={{ baseUrl, bearer, model }} />)}
             </div>
           </div>
         );
@@ -265,9 +281,25 @@ export default function TestsWorkspace({
   );
 }
 
-function CaseRow({ c, canWork, storyTitle, run, busy }: { c: TestCaseView; canWork: boolean; storyTitle?: string; run: <T>(k: string, fn: () => Promise<T & { error?: string }>) => Promise<unknown>; busy: string | null }) {
+function CaseRow({ c, canWork, storyTitle, run, busy, runCfg }: { c: TestCaseView; canWork: boolean; storyTitle?: string; run: <T>(k: string, fn: () => Promise<T & { error?: string }>) => Promise<unknown>; busy: string | null; runCfg: { baseUrl: string; bearer: string; model: string } }) {
   const [editing, setEditing] = useState(false);
   const [d, setD] = useState(c);
+  const [running, setRunning] = useState(false);
+  const [runRes, setRunRes] = useState<TestRunResult | null>(null);
+  const [runErr, setRunErr] = useState<string | null>(null);
+
+  async function doRun() {
+    setRunning(true); setRunErr(null); setRunRes(null);
+    try {
+      const r = await runTestCase(c.id, { baseUrl: runCfg.baseUrl || undefined, bearer: runCfg.bearer || undefined, model: runCfg.model });
+      if (r && "error" in r && r.error) setRunErr(r.error);
+      else if (r && "result" in r && r.result) setRunRes(r.result);
+    } catch (e) {
+      setRunErr(e instanceof Error ? e.message : "Run failed.");
+    } finally {
+      setRunning(false);
+    }
+  }
 
   if (editing) {
     return (
@@ -300,11 +332,13 @@ function CaseRow({ c, canWork, storyTitle, run, busy }: { c: TestCaseView; canWo
             <span className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${priTone(c.priority)}`}>{c.priority}</span>
             {c.suites.map((s) => <span key={s} className="rounded-full bg-neutral-100 px-1.5 py-0.5 text-[10px] text-neutral-500">{s}</span>)}
             {c.status === "approved" && <span className="rounded-full bg-green-50 px-1.5 py-0.5 text-[10px] text-green-700">approved</span>}
+            {c.lastRunStatus && <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-medium ${runTone(c.lastRunStatus)}`}>run: {c.lastRunStatus}</span>}
           </div>
           {storyTitle && <div className="mt-0.5 text-xs text-neutral-400">↳ {storyTitle}</div>}
         </div>
         {canWork && (
           <div className="flex shrink-0 items-center gap-2 text-xs">
+            {c.category === "api" && <button onClick={doRun} disabled={running} className="font-medium text-blue-600 hover:text-blue-800 disabled:opacity-40">{running ? "Running…" : "Run"}</button>}
             <button onClick={() => run("status", () => setTestCaseStatus(c.id, c.status !== "approved"))} className="text-neutral-500 hover:text-neutral-900">{c.status === "approved" ? "Unapprove" : "Approve"}</button>
             <button onClick={() => setEditing(true)} className="text-neutral-500 hover:text-neutral-900">Edit</button>
             <button onClick={() => run("del", () => deleteTestCase(c.id))} disabled={busy === "del"} className="text-red-500 hover:text-red-700">Delete</button>
@@ -314,6 +348,19 @@ function CaseRow({ c, canWork, storyTitle, run, busy }: { c: TestCaseView; canWo
       {c.preconditions && <div className="mt-1 text-xs text-neutral-500"><span className="font-medium">Pre:</span> {c.preconditions}</div>}
       {c.steps.length > 0 && <pre className="mt-1 whitespace-pre-wrap rounded bg-neutral-50 px-3 py-2 font-mono text-xs text-neutral-700">{c.steps.join("\n")}</pre>}
       {c.expectedResult && <div className="mt-1 text-xs text-neutral-600"><span className="font-medium">Expected:</span> {c.expectedResult}</div>}
+      {runErr && <div className="mt-2 rounded bg-red-50 px-3 py-2 text-xs text-red-700">{runErr}</div>}
+      {runRes && (
+        <div className="mt-2 rounded border border-neutral-200 px-3 py-2 text-xs">
+          <div>Run: <span className={`font-medium ${runText(runRes.status)}`}>{runRes.status}</span>{runRes.durationMs != null ? ` · ${runRes.durationMs}ms` : ""} <span className="text-neutral-400">· {runRes.runner}</span></div>
+          {runRes.steps.map((s, i) => (
+            <div key={i} className="mt-1">
+              <span className={runText(s.status)}>{runMark(s.status)}</span> <span className="text-neutral-700">{s.text}</span>
+              {s.detail && <div className="break-all pl-4 font-mono text-[10px] text-neutral-400">{s.detail}</div>}
+            </div>
+          ))}
+          {runRes.error && <div className="mt-1 text-red-600">{runRes.error}</div>}
+        </div>
+      )}
     </div>
   );
 }
