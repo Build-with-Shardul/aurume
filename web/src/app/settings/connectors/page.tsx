@@ -1,10 +1,9 @@
 import { redirect } from "next/navigation";
-import Link from "next/link";
 import { eq } from "drizzle-orm";
 import { getActiveMembership, canManageOrg } from "@/lib/auth-server";
 import { db } from "@/lib/db";
 import { connector } from "@/lib/db/schema";
-import { CONNECTOR_PROVIDERS } from "@/lib/connectors";
+import { CONNECTOR_PROVIDERS, CONNECTOR_CATEGORIES } from "@/lib/connectors";
 import { decryptSecret, maskSecret } from "@/lib/crypto";
 import ConnectorsClient from "./connectors-client";
 
@@ -23,10 +22,7 @@ export default async function ConnectorsPage() {
   if (!canManageOrg(m.role)) {
     return (
       <Shell>
-        <Link href="/" className="text-sm text-neutral-500 hover:text-neutral-900">
-          ← Back
-        </Link>
-        <h1 className="mt-3 text-2xl font-semibold">Connectors</h1>
+        <h1 className="text-2xl font-semibold">Connectors</h1>
         <p className="mt-2 text-sm text-neutral-500">Only owners and admins can manage connectors.</p>
       </Shell>
     );
@@ -48,14 +44,11 @@ export default async function ConnectorsPage() {
 
   return (
     <Shell>
-      <Link href="/" className="text-sm text-neutral-500 hover:text-neutral-900">
-        ← Back
-      </Link>
-      <h1 className="mt-3 text-2xl font-semibold">Connectors</h1>
+      <h1 className="text-2xl font-semibold">Connectors</h1>
       <p className="mt-1 text-sm text-neutral-500">
         Connect Aurume to the tools you use. Keys are encrypted and never shown again in full.
       </p>
-      <ConnectorsClient providers={CONNECTOR_PROVIDERS} connected={connected} />
+      <ConnectorsClient providers={CONNECTOR_PROVIDERS} connected={connected} categories={CONNECTOR_CATEGORIES} />
     </Shell>
   );
 }

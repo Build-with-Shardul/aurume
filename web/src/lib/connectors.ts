@@ -11,13 +11,19 @@ export type ConnectorField = {
   placeholder?: string;
 };
 
+export type ConnectorLogo = { bg: string; fg: string; mark: string };
 export type ConnectorProvider = {
   id: string;
   name: string;
   description: string;
+  category: string;
+  logo: ConnectorLogo;
   available: boolean;
   fields: ConnectorField[];
 };
+
+// Category display order.
+export const CONNECTOR_CATEGORIES = ["AI models", "Design & engineering", "Communication", "Integrations"];
 
 // The registry drives the Connectors UI. Adding a provider later = add an entry here
 // (and teach the relevant feature to read it). Only `available` ones can be configured.
@@ -25,6 +31,8 @@ export const CONNECTOR_PROVIDERS: ConnectorProvider[] = [
   {
     id: "resend",
     name: "Resend",
+    category: "Communication",
+    logo: { bg: "#000000", fg: "#fff", mark: "R" },
     description: "Send invitation and notification emails from your own domain.",
     available: true,
     fields: [
@@ -35,6 +43,8 @@ export const CONNECTOR_PROVIDERS: ConnectorProvider[] = [
   {
     id: "slack",
     name: "Slack",
+    category: "Communication",
+    logo: { bg: "#4A154B", fg: "#fff", mark: "S" },
     description: "Connect your Slack workspace once; projects then point at their own channels.",
     available: true,
     fields: [
@@ -44,6 +54,8 @@ export const CONNECTOR_PROVIDERS: ConnectorProvider[] = [
   {
     id: "teams",
     name: "Microsoft Teams",
+    category: "Communication",
+    logo: { bg: "#6264A7", fg: "#fff", mark: "T" },
     description: "Connect your Teams tenant once; projects then point at their own channels.",
     available: true,
     fields: [
@@ -55,6 +67,8 @@ export const CONNECTOR_PROVIDERS: ConnectorProvider[] = [
   {
     id: "anthropic",
     name: "Anthropic",
+    category: "AI models",
+    logo: { bg: "#D97757", fg: "#fff", mark: "A" },
     description: "Claude — the default LLM for playbook and artifact generation.",
     available: true,
     fields: [{ key: "apiKey", label: "API key", type: "password", secret: true, placeholder: "sk-ant-..." }],
@@ -62,6 +76,8 @@ export const CONNECTOR_PROVIDERS: ConnectorProvider[] = [
   {
     id: "openai",
     name: "OpenAI",
+    category: "AI models",
+    logo: { bg: "#10A37F", fg: "#fff", mark: "O" },
     description: "Alternative LLM provider (set AURUME_LLM_PROVIDER=openai to use).",
     available: true,
     fields: [{ key: "apiKey", label: "API key", type: "password", secret: true, placeholder: "sk-..." }],
@@ -69,6 +85,8 @@ export const CONNECTOR_PROVIDERS: ConnectorProvider[] = [
   {
     id: "ollama",
     name: "Ollama",
+    category: "AI models",
+    logo: { bg: "#111111", fg: "#fff", mark: "L" },
     description: "Local, self-hosted models (set AURUME_LLM_PROVIDER=ollama). No key needed.",
     available: true,
     fields: [{ key: "baseUrl", label: "Base URL", type: "text", secret: false, placeholder: "http://localhost:11434" }],
@@ -76,6 +94,8 @@ export const CONNECTOR_PROVIDERS: ConnectorProvider[] = [
   {
     id: "figma",
     name: "Figma",
+    category: "Design & engineering",
+    logo: { bg: "#F24E1E", fg: "#fff", mark: "F" },
     description: "Turn a Figma frame/component link into code (Design → code), in your chosen frontend language.",
     available: true,
     fields: [{ key: "token", label: "Personal access token", type: "password", secret: true, placeholder: "figd_..." }],
@@ -83,6 +103,8 @@ export const CONNECTOR_PROVIDERS: ConnectorProvider[] = [
   {
     id: "browserbase",
     name: "Browserbase",
+    category: "Design & engineering",
+    logo: { bg: "#6366F1", fg: "#fff", mark: "B" },
     description: "Cloud browsers for the UI testing agent — watch tests run in a live browser session.",
     available: true,
     fields: [
@@ -90,7 +112,7 @@ export const CONNECTOR_PROVIDERS: ConnectorProvider[] = [
       { key: "projectId", label: "Project ID", type: "text", secret: false, placeholder: "your Browserbase project id" },
     ],
   },
-  { id: "jira", name: "Jira", description: "Sync stories to your Jira board.", available: false, fields: [] },
+  { id: "jira", name: "Jira", description: "Sync stories to your Jira board.", category: "Integrations", logo: { bg: "#2684FF", fg: "#fff", mark: "J" }, available: false, fields: [] },
 ];
 
 export function getProvider(id: string) {
