@@ -31,12 +31,7 @@ export default async function ResourcePage({ params }: { params: Promise<{ userI
 
   return (
     <main className="min-h-screen bg-neutral-50 text-neutral-900">
-      <header className="border-b border-neutral-200 bg-white">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
-          <Link href="/" className="font-semibold">Aurume</Link>
-        </div>
-      </header>
-      <div className="mx-auto max-w-6xl px-6 py-10">
+      <div className="w-full px-6 py-10">
         <Link href="/resources" className="text-sm text-neutral-500 hover:text-neutral-900">← Resources</Link>
         <h1 className="mt-3 text-2xl font-semibold">{mem.name || mem.email}</h1>
         <p className="mt-1 text-sm text-neutral-500">{mem.discipline ? DISCIPLINE_LABEL[mem.discipline] ?? mem.discipline : "No role set"} · {mem.email}</p>

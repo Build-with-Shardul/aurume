@@ -7,6 +7,16 @@ schema, and behavior can change between pre-releases.
 
 ## [Unreleased]
 
+### Changed
+- **App shell: full-width workspace + collapsible left sidebar** — replaced the
+  per-page top nav bars with one persistent **collapsible sidebar** (Projects, Org
+  knowledge, Resources, Manage people, AI usage, a **Settings** group → Profile / My
+  role / Connectors, plus Platform admin, and the signed-in user + sign-out), and made
+  every page **full width**. New `AppSidebar`/`AppChrome` mounted in the root layout
+  (shown only when authenticated; login/setup/accept-invitation stay bare); collapse
+  state persists. Added minimal **Profile** and **My role** settings pages. Browser tab
+  title is now "Aurume".
+
 ### Added
 - **Testing engine — pluggable runner + API executor (Phase 0/1)** — the execution
   side of the delivery chain, closing requirement → test → verdict. A license-neutral

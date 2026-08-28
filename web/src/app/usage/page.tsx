@@ -8,12 +8,7 @@ import { aiGeneration, project } from "@/lib/db/schema";
 function Shell({ children }: { children: React.ReactNode }) {
   return (
     <main className="min-h-screen bg-neutral-50 text-neutral-900">
-      <header className="border-b border-neutral-200 bg-white">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
-          <Link href="/" className="font-semibold">Aurume</Link>
-        </div>
-      </header>
-      <div className="mx-auto max-w-6xl px-6 py-10">{children}</div>
+      <div className="w-full px-6 py-10">{children}</div>
     </main>
   );
 }

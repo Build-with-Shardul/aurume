@@ -33,13 +33,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
 
   return (
     <main className="min-h-screen bg-neutral-50 text-neutral-900">
-      <header className="border-b border-neutral-200 bg-white">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
-          <Link href="/" className="font-semibold">Aurume</Link>
-          <span className="text-sm text-neutral-500">{m.role}</span>
-        </div>
-      </header>
-      <div className="mx-auto max-w-6xl px-6 py-10">
+      <div className="w-full px-6 py-10">
         <Link href="/projects" className="text-sm text-neutral-500 hover:text-neutral-900">← Projects</Link>
         <div className="mt-3 flex items-start justify-between gap-4">
           <div>

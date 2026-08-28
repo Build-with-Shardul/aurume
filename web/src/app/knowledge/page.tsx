@@ -30,13 +30,7 @@ export default async function OrgKnowledgePage() {
 
   return (
     <main className="min-h-screen bg-neutral-50 text-neutral-900">
-      <header className="border-b border-neutral-200 bg-white">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
-          <Link href="/" className="font-semibold">Aurume</Link>
-          <span className="text-sm text-neutral-500">{m.role}</span>
-        </div>
-      </header>
-      <div className="mx-auto max-w-6xl px-6 py-10">
+      <div className="w-full px-6 py-10">
         <Link href="/" className="text-sm text-neutral-500 hover:text-neutral-900">← Back</Link>
         <h1 className="mt-3 text-2xl font-semibold">Organization knowledge</h1>
         <p className="mt-1 text-sm text-neutral-500">

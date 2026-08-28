@@ -1,10 +1,9 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { eq } from "drizzle-orm";
-import { getSession, hasUsers, isInstanceAdmin } from "@/lib/auth-server";
+import { getSession, hasUsers } from "@/lib/auth-server";
 import { db } from "@/lib/db";
 import { member, organization } from "@/lib/db/schema";
-import SignOutButton from "./sign-out-button";
 import StopImpersonatingButton from "./stop-impersonating-button";
 
 export default async function Home() {
@@ -20,7 +19,6 @@ export default async function Home() {
 
   const m = memberships[0];
   const canManage = m ? m.role === "owner" || m.role === "admin" : false;
-  const instanceAdmin = await isInstanceAdmin();
   const impersonatedBy = (session.session as { impersonatedBy?: string | null }).impersonatedBy;
 
   return (
@@ -30,22 +28,8 @@ export default async function Home() {
           You&apos;re impersonating <strong>{session.user.email}</strong>. <StopImpersonatingButton />
         </div>
       )}
-      <header className="border-b border-neutral-200 bg-white">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
-          <span className="font-semibold">Aurume</span>
-          <div className="flex items-center gap-4 text-sm">
-            {instanceAdmin && (
-              <Link href="/superadmin" className="text-neutral-500 hover:text-neutral-900">
-                Platform admin
-              </Link>
-            )}
-            <span className="text-neutral-500">{session.user.email}</span>
-            <SignOutButton />
-          </div>
-        </div>
-      </header>
 
-      <div className="mx-auto max-w-6xl px-6 py-10">
+      <div className="w-full px-6 py-10">
         <h1 className="text-2xl font-semibold">
           Welcome{session.user.name ? `, ${session.user.name}` : ""}.
         </h1>

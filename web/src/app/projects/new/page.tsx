@@ -22,13 +22,6 @@ export default async function NewProjectPage() {
 
   return (
     <main className="min-h-screen bg-neutral-50 text-neutral-900">
-      <header className="border-b border-neutral-200 bg-white">
-        <div className="mx-auto flex max-w-2xl items-center justify-between px-6 py-4">
-          <Link href="/" className="font-semibold">
-            Aurume
-          </Link>
-        </div>
-      </header>
       <div className="mx-auto max-w-2xl px-6 py-10">
         <Link href="/projects" className="text-sm text-neutral-500 hover:text-neutral-900">← Projects</Link>
         <h1 className="mt-3 text-2xl font-semibold">New project</h1>
