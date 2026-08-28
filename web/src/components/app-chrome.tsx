@@ -2,6 +2,7 @@
 
 import { usePathname } from "next/navigation";
 import AppSidebar from "./app-sidebar";
+import AppAssistant from "./app-assistant";
 import StopImpersonatingButton from "@/app/stop-impersonating-button";
 
 // Routes that render without the app shell (unauthenticated / full-bleed).
@@ -38,6 +39,7 @@ export default function AppChrome({
         )}
         {children}
       </div>
+      <AppAssistant />
     </div>
   );
 }

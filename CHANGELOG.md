@@ -7,6 +7,16 @@ schema, and behavior can change between pre-releases.
 
 ## [Unreleased]
 
+### Added
+- **Ask Aurume — in-app assistant (right-side chat)** — a collapsible chat panel docked
+  on the right of every authenticated screen (persists across navigation; collapse state
+  saved). Ask a question and it answers **from your workspace only** — projects, product
+  playbook, technical design, epics/stories, test plan, and knowledge — gathering a
+  bounded, relevant context server-side (scoped to the current project when you're inside
+  one) and refusing to invent facts not in the workspace. Reuses the provider-agnostic
+  LLM (BYO key). Verified live: grounded answers citing the playbook hypothesis and the
+  test-plan case count.
+
 ### Changed
 - **App shell: full-width workspace + collapsible left sidebar** — replaced the
   per-page top nav bars with one persistent **collapsible sidebar** (Projects, Org
