@@ -46,8 +46,8 @@ export default function AppAssistant() {
 
   if (!open) {
     return (
-      <div className="sticky top-0 flex h-screen w-12 shrink-0 flex-col items-center border-l border-neutral-200 bg-white py-4">
-        <button onClick={toggle} title="Ask Aurume" aria-label="Open assistant" className="rounded-lg p-2 text-lg hover:bg-neutral-100">💬</button>
+      <div className="sticky top-0 flex h-screen w-12 shrink-0 flex-col items-center justify-end border-l border-neutral-200 bg-white py-4">
+        <button onClick={toggle} title="Ask Aurume" aria-label="Open assistant" className="rounded-full bg-neutral-900 p-2.5 text-lg text-white shadow-sm hover:bg-neutral-800">💬</button>
       </div>
     );
   }
@@ -72,7 +72,13 @@ export default function AppAssistant() {
         )}
         {messages.map((mm, i) => (
           <div key={i} className={mm.role === "user" ? "flex justify-end" : "flex"}>
-            <div className={`max-w-[85%] whitespace-pre-wrap rounded-xl px-3 py-2 ${mm.role === "user" ? "bg-neutral-900 text-white" : "bg-neutral-100 text-neutral-800"}`}>{mm.content}</div>
+            {mm.role === "user" ? (
+              <div className="max-w-[85%] whitespace-pre-wrap rounded-xl bg-neutral-900 px-3 py-2 text-white">{mm.content}</div>
+            ) : (
+              <div className="max-w-[85%] rounded-xl bg-neutral-100 px-3 py-2 leading-relaxed text-neutral-800">
+                <Markdown text={mm.content} />
+              </div>
+            )}
           </div>
         ))}
         {sending && <div className="text-xs text-neutral-400">Thinking…</div>}
@@ -95,4 +101,55 @@ export default function AppAssistant() {
       </div>
     </aside>
   );
+}
+
+// --- tiny markdown renderer (bold / italic / inline code / bullet & numbered lists / headings) ---
+function renderInline(text: string, keyBase: string): React.ReactNode[] {
+  const nodes: React.ReactNode[] = [];
+  const regex = /(\*\*([^*]+)\*\*|`([^`]+)`|\*([^*]+)\*|_([^_]+)_)/g;
+  let last = 0;
+  let i = 0;
+  let m: RegExpExecArray | null;
+  while ((m = regex.exec(text)) !== null) {
+    if (m.index > last) nodes.push(text.slice(last, m.index));
+    if (m[2] != null) nodes.push(<strong key={`${keyBase}-${i}`}>{m[2]}</strong>);
+    else if (m[3] != null) nodes.push(<code key={`${keyBase}-${i}`} className="rounded bg-black/10 px-1 py-0.5 font-mono text-[12px]">{m[3]}</code>);
+    else if (m[4] != null) nodes.push(<em key={`${keyBase}-${i}`}>{m[4]}</em>);
+    else if (m[5] != null) nodes.push(<em key={`${keyBase}-${i}`}>{m[5]}</em>);
+    last = m.index + m[0].length;
+    i++;
+  }
+  if (last < text.length) nodes.push(text.slice(last));
+  return nodes;
+}
+
+function Markdown({ text }: { text: string }) {
+  const lines = text.split("\n");
+  const blocks: React.ReactNode[] = [];
+  let list: { type: "ul" | "ol"; items: string[] } | null = null;
+  let para: string[] = [];
+  const flushPara = () => {
+    if (para.length) { const k = `p${blocks.length}`; blocks.push(<p key={k}>{renderInline(para.join(" "), k)}</p>); para = []; }
+  };
+  const flushList = () => {
+    if (!list) return;
+    const k = `l${blocks.length}`;
+    const items = list.items.map((it, i) => <li key={`${k}-${i}`}>{renderInline(it, `${k}-${i}`)}</li>);
+    blocks.push(list.type === "ul" ? <ul key={k} className="list-disc space-y-0.5 pl-5">{items}</ul> : <ol key={k} className="list-decimal space-y-0.5 pl-5">{items}</ol>);
+    list = null;
+  };
+  for (const raw of lines) {
+    const line = raw.replace(/\s+$/, "");
+    const bullet = line.match(/^\s*[-*]\s+(.*)/);
+    const num = line.match(/^\s*\d+\.\s+(.*)/);
+    const heading = line.match(/^#{1,6}\s+(.*)/);
+    if (bullet) { flushPara(); if (!list || list.type !== "ul") { flushList(); list = { type: "ul", items: [] }; } list.items.push(bullet[1]); }
+    else if (num) { flushPara(); if (!list || list.type !== "ol") { flushList(); list = { type: "ol", items: [] }; } list.items.push(num[1]); }
+    else if (heading) { flushPara(); flushList(); const k = `h${blocks.length}`; blocks.push(<p key={k} className="font-semibold">{renderInline(heading[1], k)}</p>); }
+    else if (line.trim() === "") { flushPara(); flushList(); }
+    else { flushList(); para.push(line); }
+  }
+  flushPara();
+  flushList();
+  return <div className="space-y-2">{blocks}</div>;
 }
