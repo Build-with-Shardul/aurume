@@ -154,6 +154,19 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
             <div className="text-xs text-neutral-400">epic{epicCount === 1 ? "" : "s"}</div>
           </div>
         </Link>
+
+        <Link
+          href={`/projects/${id}/tests`}
+          className="mt-4 flex items-center justify-between rounded-xl border border-neutral-200 bg-white p-5 hover:border-neutral-400"
+        >
+          <div>
+            <div className="font-medium">🧪 Test cases</div>
+            <p className="mt-1 text-sm text-neutral-500">
+              AI test cases across happy path, edge, API, UI, performance & security — tagged into suites, tracked for coverage, grounded, approvable.
+            </p>
+          </div>
+          <div className="shrink-0 text-neutral-400">→</div>
+        </Link>
       </div>
     </main>
   );

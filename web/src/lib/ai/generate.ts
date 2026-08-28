@@ -25,6 +25,13 @@ import {
   scoreGroundedness as scoreTechDocGroundedness,
   type TechDocContent,
 } from "./techdoc";
+import {
+  TestCasesResultSchema,
+  TESTCASES_SYSTEM,
+  buildTestCasesPrompt,
+  scoreGroundedness as scoreTestCasesGroundedness,
+  type TestCasesResult,
+} from "./testcases";
 
 export type PlaybookDraft = {
   content: PlaybookContent;
@@ -130,6 +137,57 @@ export async function generateTechDocDraft(params: {
   return {
     content,
     groundedness,
+    provider: res.provider,
+    model: res.model,
+    promptTokens: res.promptTokens,
+    completionTokens: res.completionTokens,
+    costUsdMicros: res.costUsdMicros,
+    sourceVersion: sourceVersionHash(refs),
+    sourceKnowledge: refs.map((r) => ({ id: r.id, updatedAt: r.updatedAtISO })),
+    knowledgeCount: refs.length,
+  };
+}
+
+export type TestCasesDraft = {
+  cases: TestCasesResult["cases"];
+  groundedness: number;
+  provider: string;
+  model: string;
+  promptTokens: number;
+  completionTokens: number;
+  costUsdMicros: number | null;
+  sourceVersion: string;
+  sourceKnowledge: Array<{ id: string; updatedAt: string }>;
+  knowledgeCount: number;
+};
+
+/** Generate grounded test cases for a set of stories (an epic's, or a single story's). Pure — caller persists. */
+export async function generateTestCasesForStories(params: {
+  orgId: string;
+  projectId: string;
+  scope: { projectName: string; epicName?: string };
+  stories: Array<{ ref: string; title: string; userStory: string | null; acceptanceCriteria: string[] }>;
+  tdd: { architecture?: string; apisSummary?: string; security?: string } | null;
+  compliances: string[];
+  model?: string;
+}): Promise<TestCasesDraft> {
+  const knowledge = await getKnowledgeForAI(params.projectId);
+  const { contextText, refs } = buildKnowledgeContext(knowledge);
+  const validRefs = new Set(refs.map((r) => r.ref));
+
+  const prompt = buildTestCasesPrompt(params.scope, params.stories, params.tdd, params.compliances, contextText);
+  const res = await generateStructured({
+    orgId: params.orgId,
+    system: TESTCASES_SYSTEM,
+    prompt,
+    schema: TestCasesResultSchema,
+    schemaName: "test_cases",
+    model: params.model,
+  });
+
+  return {
+    cases: res.data.cases,
+    groundedness: scoreTestCasesGroundedness(res.data, validRefs, refs.length),
     provider: res.provider,
     model: res.model,
     promptTokens: res.promptTokens,

@@ -8,6 +8,23 @@ schema, and behavior can change between pre-releases.
 ## [Unreleased]
 
 ### Added
+- **Test Cases (AI test-case corpus + coverage)** — the story-to-tests link, a
+  first-class artifact like the Playbook/TDD (`/projects/[id]/tests`, card below
+  Epics). AI-generates comprehensive cases across **happy path, edge, negative, API,
+  UI, performance, security, accessibility**, each with Gherkin (Given/When/Then)
+  steps, expected result, priority, linked story, and **suite tags** (smoke / sanity
+  / regression / e2e) — one corpus, selected by tag rather than duplicated per
+  run-type. Generated **per epic and assembled** (project-level), or per epic / per
+  story incrementally; grounded in the stories' acceptance criteria + the TDD +
+  playbook. Normalized `test_case` rows (not a blob) so cases carry per-case
+  draft/approved status, drive a **coverage view** (which stories have cases), and
+  later feed the testing engine (their Gherkin = the `.feature` files). Versioned,
+  editable, multi-approver approval, out-of-date on story/TDD/playbook change,
+  groundedness, model picker, generation log, token/cost telemetry
+  (`kind = testcases`), and **Word/PDF export** (colored-header tables per category).
+  New tables: `test_plan`, `test_plan_approver`, `test_case`. Verified live: a real
+  epic generated 14 cases across all 8 categories and all 4 suites, 100% grounded and
+  compliance-aware, on Sonnet.
 - **Technical Design Document (TDD)** — a first-class AI artifact, the technical
   counterpart to the product playbook, with the same lifecycle. One per project
   (`/projects/[id]/tdd`, card on the project page below Design → code): AI-generated

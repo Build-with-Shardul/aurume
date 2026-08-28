@@ -7,6 +7,7 @@ import { and } from "drizzle-orm";
 import { project, playbook, epic, story, aiGeneration, projectCompliance, projectMember } from "@/lib/db/schema";
 import { generateStoriesForEpic } from "@/lib/ai/generate";
 import { LLMConfigError } from "@/lib/ai/provider";
+import { markTestPlanStale } from "../tests/actions";
 
 type PlaybookContent = {
   projectSummary: string;
@@ -165,6 +166,7 @@ export async function generateStories(epicId: string, model?: string) {
     createdBy: ctx.m.userId,
   });
 
+  await markTestPlanStale(projectId); // new stories → test coverage is behind
   return { ok: true, count: draft.stories.length, groundedness: draft.groundedness, sourceApproved };
 }
 
@@ -190,6 +192,7 @@ export async function updateStory(storyId: string, patch: { title: string; userS
     points: patch.points ?? null,
     updatedAt: new Date(),
   }).where(eq(story.id, storyId));
+  await markTestPlanStale(ctx.story.projectId); // AC changed → test cases may be behind
   return { ok: true };
 }
 
@@ -197,6 +200,7 @@ export async function deleteStory(storyId: string) {
   const ctx = await storyCtx(storyId);
   if (!ctx?.canWork) return { error: "Not allowed." };
   await db.delete(story).where(eq(story.id, storyId));
+  await markTestPlanStale(ctx.story.projectId);
   return { ok: true };
 }
 

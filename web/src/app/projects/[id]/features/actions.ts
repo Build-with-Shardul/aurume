@@ -8,6 +8,7 @@ import { generateProductPlaybookDraft } from "@/lib/ai/generate";
 import { LLMConfigError } from "@/lib/ai/provider";
 import { PlaybookContentSchema } from "@/lib/ai/playbook";
 import { markTechDocStale } from "../tdd/actions";
+import { markTestPlanStale } from "../tests/actions";
 
 async function loadProjectCtx(projectId: string) {
   const m = await getActiveMembership();
@@ -29,8 +30,9 @@ async function latestPlaybook(projectId: string) {
 /** Features changed → the product playbook no longer reflects the project. */
 async function markPlaybookStale(projectId: string) {
   await db.update(playbook).set({ stale: true }).where(eq(playbook.projectId, projectId));
-  // The tech doc grounds on the playbook + features, so the same changes stale it too.
+  // The tech doc + test plan ground on the playbook + features, so the same changes stale them too.
   await markTechDocStale(projectId);
+  await markTestPlanStale(projectId);
 }
 
 export async function createFeature(projectId: string, title: string, brief: string) {

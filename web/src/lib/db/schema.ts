@@ -465,6 +465,87 @@ export const techDocApprover = pgTable(
   (t) => [uniqueIndex("tech_doc_approver_uidx").on(t.techDocId, t.userId)],
 );
 
+// A Test Plan — the project's single versioned test-case corpus, generated per epic
+// and assembled, grounded in stories' acceptance criteria + the TDD + playbook.
+// Versioned/approvable like the playbook & TDD; the cases themselves are normalized
+// rows (testCase) so they can be tagged into suites, tracked for coverage, and run.
+export const testPlan = pgTable(
+  "test_plan",
+  {
+    id: text("id").primaryKey(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    projectId: text("project_id")
+      .notNull()
+      .references(() => project.id, { onDelete: "cascade" }),
+    version: integer("version").notNull().default(1),
+    status: text("status").notNull().default("draft"), // draft | approved
+    stale: boolean("stale").notNull().default(false),
+    groundedness: integer("groundedness"),
+    edited: boolean("edited").notNull().default(false),
+    provider: text("provider"),
+    model: text("model"),
+    sourceVersion: text("source_version"),
+    sourceKnowledge: jsonb("source_knowledge"),
+    createdBy: text("created_by").references(() => user.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+    approvedAt: timestamp("approved_at"),
+  },
+  (t) => [index("test_plan_project_idx").on(t.projectId)],
+);
+
+export const testPlanApprover = pgTable(
+  "test_plan_approver",
+  {
+    id: text("id").primaryKey(),
+    testPlanId: text("test_plan_id")
+      .notNull()
+      .references(() => testPlan.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    approvedAt: timestamp("approved_at"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => [uniqueIndex("test_plan_approver_uidx").on(t.testPlanId, t.userId)],
+);
+
+// A single test case — a normalized row so it can be tagged into suites, checked for
+// coverage against stories, and executed (its Gherkin steps ARE the .feature the
+// engine runs). Its verdict comes back on a test_run (added with the engine).
+export const testCase = pgTable(
+  "test_case",
+  {
+    id: text("id").primaryKey(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    projectId: text("project_id")
+      .notNull()
+      .references(() => project.id, { onDelete: "cascade" }),
+    testPlanId: text("test_plan_id")
+      .notNull()
+      .references(() => testPlan.id, { onDelete: "cascade" }),
+    epicId: text("epic_id"),
+    storyId: text("story_id"),
+    category: text("category").notNull().default("happy"), // happy | edge | negative | api | ui | performance | security | accessibility
+    title: text("title").notNull(),
+    priority: text("priority").notNull().default("medium"), // high | medium | low
+    preconditions: text("preconditions"),
+    steps: jsonb("steps").notNull().default([]), // string[] of Given/When/Then lines
+    expectedResult: text("expected_result"),
+    suites: jsonb("suites").notNull().default([]), // string[] subset of smoke | sanity | regression | e2e
+    status: text("status").notNull().default("draft"), // draft | approved
+    orderIndex: integer("order_index").notNull().default(0),
+    createdBy: text("created_by").references(() => user.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (t) => [index("test_case_plan_idx").on(t.testPlanId), index("test_case_story_idx").on(t.storyId)],
+);
+
 // An Epic — the next link in the delivery chain, promoted from a playbook's
 // in-scope epics (or added manually). Lineage: sourcePlaybookId + sourceVersion.
 export const epic = pgTable(
