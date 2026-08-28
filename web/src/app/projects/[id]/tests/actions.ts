@@ -115,6 +115,39 @@ async function logGeneration(opts: { orgId: string; projectId: string; planId: s
   });
 }
 
+const STORY_BATCH = 3; // stories per LLM call — keeps structured output within the token budget
+
+type EpicTotals = { generated: number; prompt: number; completion: number; cost: number; costKnown: boolean; groundednessSum: number; batches: number; provider: string; model: string; sourceVersion: string; sourceKnowledge: Array<{ id: string; updatedAt: string }> };
+
+/** Generate + insert cases for one epic, in small story-batches so no single response is truncated. */
+async function genEpicCases(opts: {
+  ctx: NonNullable<Awaited<ReturnType<typeof loadProjectCtx>>>;
+  projectId: string; planId: string; epicId: string; epicName: string;
+  tdd: Awaited<ReturnType<typeof tddContext>>; compliances: string[]; model?: string; startOrder: number;
+}): Promise<EpicTotals> {
+  const all = await storiesForEpic(opts.epicId);
+  const batches: GenStory[][] = all.length ? [] : [[]];
+  for (let i = 0; i < all.length; i += STORY_BATCH) batches.push(all.slice(i, i + STORY_BATCH));
+
+  const t: EpicTotals = { generated: 0, prompt: 0, completion: 0, cost: 0, costKnown: false, groundednessSum: 0, batches: 0, provider: "", model: "", sourceVersion: "", sourceKnowledge: [] };
+  let order = opts.startOrder;
+  for (const raw of batches) {
+    const batch = raw.map((s, j) => ({ ...s, ref: `S${j + 1}` })); // refs are per-batch
+    const draft = await generateTestCasesForStories({
+      orgId: opts.ctx.m.orgId!, projectId: opts.projectId,
+      scope: { projectName: opts.ctx.project.name, epicName: opts.epicName },
+      stories: batch, tdd: opts.tdd, compliances: opts.compliances, model: opts.model,
+    });
+    await insertCases({ orgId: opts.ctx.m.orgId!, projectId: opts.projectId, planId: opts.planId, epicId: opts.epicId, stories: batch, cases: draft.cases, createdBy: opts.ctx.m.userId, baseOrder: order });
+    order += draft.cases.length;
+    t.generated += draft.cases.length; t.prompt += draft.promptTokens; t.completion += draft.completionTokens;
+    if (draft.costUsdMicros != null) { t.cost += draft.costUsdMicros; t.costKnown = true; }
+    t.groundednessSum += draft.groundedness; t.batches++;
+    t.provider = draft.provider; t.model = draft.model; t.sourceVersion = draft.sourceVersion; t.sourceKnowledge = draft.sourceKnowledge;
+  }
+  return t;
+}
+
 /** Full corpus: new plan version, generate per epic, assemble. */
 export async function generateProjectTestCases(projectId: string, model?: string) {
   const ctx = await loadProjectCtx(projectId);
@@ -145,22 +178,19 @@ export async function generateProjectTestCases(projectId: string, model?: string
   let generated = 0;
 
   for (const e of epics) {
-    const stories = await storiesForEpic(e.id);
-    if (!stories.length) continue;
-    let draft;
+    let t;
     try {
-      draft = await generateTestCasesForStories({ orgId: ctx.m.orgId!, projectId, scope: { projectName: ctx.project.name, epicName: e.name }, stories, tdd, compliances, model });
+      t = await genEpicCases({ ctx, projectId, planId, epicId: e.id, epicName: e.name, tdd, compliances, model, startOrder: order });
     } catch (err) {
       if (err instanceof LLMConfigError) return { error: err.message };
       return { error: err instanceof Error ? `Generation failed on epic "${e.name}": ${err.message}` : "Generation failed." };
     }
-    await insertCases({ orgId: ctx.m.orgId!, projectId, planId, epicId: e.id, stories, cases: draft.cases, createdBy: ctx.m.userId, baseOrder: order });
-    order += draft.cases.length;
-    generated += draft.cases.length;
-    totalPrompt += draft.promptTokens; totalCompletion += draft.completionTokens;
-    if (draft.costUsdMicros != null) { totalCost += draft.costUsdMicros; costKnown = true; }
-    groundednessSum += draft.groundedness; groundedCount++;
-    provider = draft.provider; model2 = draft.model; sourceVersion = draft.sourceVersion; sourceKnowledge = draft.sourceKnowledge;
+    order += t.generated;
+    generated += t.generated;
+    totalPrompt += t.prompt; totalCompletion += t.completion;
+    if (t.costKnown) { totalCost += t.cost; costKnown = true; }
+    groundednessSum += t.groundednessSum; groundedCount += t.batches;
+    if (t.provider) { provider = t.provider; model2 = t.model; sourceVersion = t.sourceVersion; sourceKnowledge = t.sourceKnowledge; }
   }
 
   const groundedness = groundedCount ? Math.round(groundednessSum / groundedCount) : 0;
@@ -187,20 +217,20 @@ export async function generateEpicTestCases(projectId: string, epicId: string, m
   const tdd = await tddContext(projectId);
   const compliances = await complianceLabels(projectId);
 
-  let draft;
+  await db.delete(testCase).where(and(eq(testCase.testPlanId, planId), eq(testCase.epicId, epicId)));
+  const baseOrder = (await db.select({ id: testCase.id }).from(testCase).where(eq(testCase.testPlanId, planId))).length;
+
+  let t;
   try {
-    draft = await generateTestCasesForStories({ orgId: ctx.m.orgId!, projectId, scope: { projectName: ctx.project.name, epicName: e.name }, stories, tdd, compliances, model });
+    t = await genEpicCases({ ctx, projectId, planId, epicId, epicName: e.name, tdd, compliances, model, startOrder: baseOrder });
   } catch (err) {
     if (err instanceof LLMConfigError) return { error: err.message };
     return { error: err instanceof Error ? `Generation failed: ${err.message}` : "Generation failed." };
   }
-
-  await db.delete(testCase).where(and(eq(testCase.testPlanId, planId), eq(testCase.epicId, epicId)));
-  const baseOrder = (await db.select({ id: testCase.id }).from(testCase).where(eq(testCase.testPlanId, planId))).length;
-  await insertCases({ orgId: ctx.m.orgId!, projectId, planId, epicId, stories, cases: draft.cases, createdBy: ctx.m.userId, baseOrder });
+  const groundedness = t.batches ? Math.round(t.groundednessSum / t.batches) : 0;
   await db.update(testPlan).set({ edited: true, updatedAt: new Date() }).where(eq(testPlan.id, planId));
-  await logGeneration({ orgId: ctx.m.orgId!, projectId, planId, draft, createdBy: ctx.m.userId });
-  return { ok: true, count: draft.cases.length, groundedness: draft.groundedness };
+  await db.insert(aiGeneration).values({ id: crypto.randomUUID(), organizationId: ctx.m.orgId!, projectId, playbookId: planId, kind: "testcases", provider: t.provider, model: t.model, promptTokens: t.prompt, completionTokens: t.completion, costUsdMicros: t.costKnown ? t.cost : null, groundedness, outcome: "generated", createdBy: ctx.m.userId });
+  return { ok: true, count: t.generated, groundedness };
 }
 
 /** Incremental: (re)generate cases for a single story within the current plan. */

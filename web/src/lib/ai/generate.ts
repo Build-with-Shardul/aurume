@@ -170,6 +170,7 @@ export async function generateTestCasesForStories(params: {
   tdd: { architecture?: string; apisSummary?: string; security?: string } | null;
   compliances: string[];
   model?: string;
+  maxTokens?: number;
 }): Promise<TestCasesDraft> {
   const knowledge = await getKnowledgeForAI(params.projectId);
   const { contextText, refs } = buildKnowledgeContext(knowledge);
@@ -183,6 +184,7 @@ export async function generateTestCasesForStories(params: {
     schema: TestCasesResultSchema,
     schemaName: "test_cases",
     model: params.model,
+    maxTokens: params.maxTokens, // default (16k) is safe once generation is batched by story
   });
 
   return {
