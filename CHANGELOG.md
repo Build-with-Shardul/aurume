@@ -20,6 +20,17 @@ schema, and behavior can change between pre-releases.
   Permissive/own engine (no AGPL) — the UI (browser) runner lands next behind the same
   interface. New table: `test_run`. Verified: a real API case ran green against a live
   API (all assertions passed), and mismatched endpoints correctly report failed.
+- **UI testing agent — Browserbase plumbing (Phase 2 scaffold)** — the seam + config
+  for the browser agent, ahead of the agent loop itself. A **Browserbase connector**
+  (encrypted API key + project id), an encrypted per-project **test-credentials store**
+  (`test_credential`; the agent injects logins/tokens at run time — secrets envelope-
+  encrypted, never sent to the client), a config-gated **`ui` runner** behind the same
+  `TestRunner` interface (`ui`/`accessibility` cases route to it; clear "connect
+  Browserbase" message until keyed), and a **Testing engine & credentials** panel on the
+  Test Cases page (runner status + credential manager). The perceive→plan→act agent loop
+  (accessibility-tree grounding, live-view streaming) is built next against a real
+  target app. New table: `test_credential`. Verified: credential round-trips encrypted
+  (never plaintext at rest), connector + panel render, UI cases gate correctly.
 - **Test Cases (AI test-case corpus + coverage)** — the story-to-tests link, a
   first-class artifact like the Playbook/TDD (`/projects/[id]/tests`, card below
   Epics). AI-generates comprehensive cases across **happy path, edge, negative, API,

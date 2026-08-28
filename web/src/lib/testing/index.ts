@@ -1,6 +1,7 @@
 import type { TestRunner } from "./types";
 import { ApiRunner } from "./runners/api";
 import { ManualRunner } from "./runners/manual";
+import { UiRunner } from "./runners/ui";
 
 export * from "./types";
 export { caseToFeature, storyToFeature } from "./gherkin";
@@ -14,6 +15,8 @@ export function getTestRunner(id: string, ctx: RunnerCtx): TestRunner {
   switch (id) {
     case "api":
       return new ApiRunner(ctx);
+    case "ui":
+      return new UiRunner(ctx);
     case "manual":
     default:
       return new ManualRunner();
@@ -23,6 +26,6 @@ export function getTestRunner(id: string, ctx: RunnerCtx): TestRunner {
 /** Which runner should execute a given test-case category (null = not yet executable here). */
 export function runnerForCategory(category: string): string | null {
   if (category === "api") return "api";
-  if (category === "ui" || category === "accessibility") return null; // browser engine (Phase 2)
+  if (category === "ui" || category === "accessibility") return "ui"; // browser agent (Browserbase)
   return null; // performance/security → specialist tooling later
 }

@@ -12,8 +12,13 @@ import {
   setTestPlanApprovers,
   approveTestPlan,
   runTestCase,
+  addTestCredential,
+  deleteTestCredential,
 } from "./actions";
 import type { TestRunResult } from "@/lib/testing";
+
+export type CredentialView = { id: string; name: string; kind: string; username: string | null; targetUrl: string | null; hasSecret: boolean };
+const RUNNABLE = new Set(["api", "ui", "accessibility"]);
 
 export type TestPlanView = {
   id: string;
@@ -61,7 +66,7 @@ const runText = (s: string) => (s === "passed" ? "text-green-600" : s === "faile
 const runMark = (s: string) => (s === "passed" ? "✓" : s === "failed" ? "✗" : s === "error" ? "!" : "–");
 
 export default function TestsWorkspace({
-  projectId, plan, cases, coverage, epics, stories, members, canWork, meId, modelInfo, generationLog,
+  projectId, plan, cases, coverage, epics, stories, members, canWork, meId, modelInfo, generationLog, credentials, browserbaseConnected,
 }: {
   projectId: string;
   plan: TestPlanView | null;
@@ -74,6 +79,8 @@ export default function TestsWorkspace({
   meId: string;
   modelInfo: ModelInfo;
   generationLog: LogEntry[];
+  credentials: CredentialView[];
+  browserbaseConnected: boolean;
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState<string | null>(null);
@@ -234,8 +241,10 @@ export default function TestsWorkspace({
         <span className="font-medium text-neutral-600">Run API cases against:</span>
         <input value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} placeholder="Base URL — https://api.example.com" className="w-64 rounded border border-neutral-300 px-2 py-1" />
         <input value={bearer} onChange={(e) => setBearer(e.target.value)} placeholder="Bearer token (optional)" type="password" className="w-48 rounded border border-neutral-300 px-2 py-1" />
-        <span className="text-neutral-400">API cases execute here; UI cases need the browser engine (Phase 2).</span>
+        <span className="text-neutral-400">API cases execute here; UI cases run via the browser agent (Browserbase).</span>
       </div>
+
+      <EnginePanel projectId={projectId} browserbaseConnected={browserbaseConnected} credentials={credentials} canWork={canWork} run={run} busy={busy} />
 
       {/* cases by category */}
       {CATEGORIES.map(([cat, label]) => {
@@ -338,7 +347,7 @@ function CaseRow({ c, canWork, storyTitle, run, busy, runCfg }: { c: TestCaseVie
         </div>
         {canWork && (
           <div className="flex shrink-0 items-center gap-2 text-xs">
-            {c.category === "api" && <button onClick={doRun} disabled={running} className="font-medium text-blue-600 hover:text-blue-800 disabled:opacity-40">{running ? "Running…" : "Run"}</button>}
+            {RUNNABLE.has(c.category) && <button onClick={doRun} disabled={running} className="font-medium text-blue-600 hover:text-blue-800 disabled:opacity-40">{running ? "Running…" : "Run"}</button>}
             <button onClick={() => run("status", () => setTestCaseStatus(c.id, c.status !== "approved"))} className="text-neutral-500 hover:text-neutral-900">{c.status === "approved" ? "Unapprove" : "Approve"}</button>
             <button onClick={() => setEditing(true)} className="text-neutral-500 hover:text-neutral-900">Edit</button>
             <button onClick={() => run("del", () => deleteTestCase(c.id))} disabled={busy === "del"} className="text-red-500 hover:text-red-700">Delete</button>
@@ -389,6 +398,69 @@ function ApproverEditor({ members, approvers, canWork, onChange }: { members: Me
           );
         })}
       </div>
+    </div>
+  );
+}
+
+function EnginePanel({ projectId, browserbaseConnected, credentials, canWork, run, busy }: { projectId: string; browserbaseConnected: boolean; credentials: CredentialView[]; canWork: boolean; run: <T>(k: string, fn: () => Promise<T & { error?: string }>) => Promise<unknown>; busy: string | null }) {
+  const [open, setOpen] = useState(false);
+  const [adding, setAdding] = useState(false);
+  const [f, setF] = useState({ name: "", kind: "login", targetUrl: "", username: "", secret: "" });
+
+  return (
+    <div className="rounded-xl border border-neutral-200 bg-white">
+      <button onClick={() => setOpen((o) => !o)} className="flex w-full items-center justify-between px-5 py-3 text-left">
+        <span className="text-sm font-medium">Testing engine & credentials</span>
+        <span className="flex items-center gap-3 text-xs">
+          <span className="flex items-center gap-1"><i className="inline-block h-1.5 w-1.5 rounded-full bg-green-500" />API runner ready</span>
+          <span className="flex items-center gap-1"><i className={`inline-block h-1.5 w-1.5 rounded-full ${browserbaseConnected ? "bg-green-500" : "bg-neutral-300"}`} />UI agent {browserbaseConnected ? "connected" : "not connected"}</span>
+          <span className="text-neutral-400">{open ? "▲" : "▼"}</span>
+        </span>
+      </button>
+      {open && (
+        <div className="space-y-4 border-t border-neutral-100 px-5 py-4">
+          {!browserbaseConnected && (
+            <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+              UI (browser) tests need Browserbase. Add an API key + Project ID in{" "}
+              <a href="/settings/connectors" className="font-medium underline">Settings → Connectors → Browserbase</a>. The agent runs each UI test in a live cloud browser you can watch.
+            </p>
+          )}
+
+          <div>
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-medium text-neutral-600">Test credentials <span className="text-neutral-400">(the UI agent injects these when a test logs in — secrets encrypted, never shown)</span></span>
+              {canWork && <button onClick={() => setAdding((a) => !a)} className="rounded border border-neutral-300 px-2 py-0.5 text-xs font-medium">{adding ? "Close" : "+ Add"}</button>}
+            </div>
+            {credentials.length === 0 && !adding && <p className="mt-2 text-xs text-neutral-400">No credentials yet.</p>}
+            {credentials.length > 0 && (
+              <div className="mt-2 space-y-1">
+                {credentials.map((c) => (
+                  <div key={c.id} className="flex items-center justify-between rounded border border-neutral-100 px-3 py-1.5 text-xs">
+                    <span className="text-neutral-700"><span className="font-medium">{c.name}</span> <span className="text-neutral-400">· {c.kind}{c.username ? ` · ${c.username}` : ""}{c.targetUrl ? ` · ${c.targetUrl}` : ""} · secret ••••</span></span>
+                    {canWork && <button onClick={() => run(`delcred-${c.id}`, () => deleteTestCredential(c.id))} disabled={busy === `delcred-${c.id}`} className="text-red-500 hover:text-red-700">Delete</button>}
+                  </div>
+                ))}
+              </div>
+            )}
+            {adding && canWork && (
+              <div className="mt-2 space-y-2 rounded-lg border border-neutral-200 bg-neutral-50 p-3">
+                <div className="flex flex-wrap gap-2">
+                  <input value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} placeholder="Name (e.g. first-run user)" className="flex-1 rounded border border-neutral-300 px-2 py-1 text-xs" />
+                  <select value={f.kind} onChange={(e) => setF({ ...f, kind: e.target.value })} className="rounded border border-neutral-300 px-2 py-1 text-xs"><option value="login">login</option><option value="token">token</option></select>
+                </div>
+                <input value={f.targetUrl} onChange={(e) => setF({ ...f, targetUrl: e.target.value })} placeholder="Target/login URL (optional)" className="w-full rounded border border-neutral-300 px-2 py-1 text-xs" />
+                {f.kind === "login" && <input value={f.username} onChange={(e) => setF({ ...f, username: e.target.value })} placeholder="Username / email" className="w-full rounded border border-neutral-300 px-2 py-1 text-xs" />}
+                <input value={f.secret} onChange={(e) => setF({ ...f, secret: e.target.value })} type="password" placeholder={f.kind === "token" ? "Token" : "Password"} className="w-full rounded border border-neutral-300 px-2 py-1 text-xs" />
+                <button
+                  onClick={async () => { const r = await run("addcred", () => addTestCredential(projectId, f)); if (r && !(typeof r === "object" && r && "error" in r && (r as { error?: string }).error)) { setF({ name: "", kind: "login", targetUrl: "", username: "", secret: "" }); setAdding(false); } }}
+                  disabled={busy === "addcred" || !f.name.trim()}
+                  className="rounded bg-neutral-900 px-3 py-1 text-xs font-medium text-white disabled:opacity-40"
+                >Save credential</button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

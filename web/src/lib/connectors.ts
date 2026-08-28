@@ -80,6 +80,16 @@ export const CONNECTOR_PROVIDERS: ConnectorProvider[] = [
     available: true,
     fields: [{ key: "token", label: "Personal access token", type: "password", secret: true, placeholder: "figd_..." }],
   },
+  {
+    id: "browserbase",
+    name: "Browserbase",
+    description: "Cloud browsers for the UI testing agent — watch tests run in a live browser session.",
+    available: true,
+    fields: [
+      { key: "apiKey", label: "API key", type: "password", secret: true, placeholder: "bb_live_..." },
+      { key: "projectId", label: "Project ID", type: "text", secret: false, placeholder: "your Browserbase project id" },
+    ],
+  },
   { id: "jira", name: "Jira", description: "Sync stories to your Jira board.", available: false, fields: [] },
 ];
 

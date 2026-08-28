@@ -577,6 +577,32 @@ export const testRun = pgTable(
   (t) => [index("test_run_case_idx").on(t.testCaseId), index("test_run_project_idx").on(t.projectId)],
 );
 
+// A Test Credential — a login/token the UI testing agent injects when a test needs to
+// authenticate against the target app. The secret is encrypted at rest (envelope
+// encryption, like connector secrets) and never returned to the client.
+export const testCredential = pgTable(
+  "test_credential",
+  {
+    id: text("id").primaryKey(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    projectId: text("project_id")
+      .notNull()
+      .references(() => project.id, { onDelete: "cascade" }),
+    name: text("name").notNull(), // label the test refers to, e.g. "first-run user"
+    kind: text("kind").notNull().default("login"), // login | token
+    targetUrl: text("target_url"), // optional login/base URL this credential is for
+    username: text("username"), // plain (an identifier, not the secret)
+    secret: text("secret"), // encrypted password or token
+    notes: text("notes"),
+    createdBy: text("created_by").references(() => user.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (t) => [index("test_credential_project_idx").on(t.projectId)],
+);
+
 // An Epic — the next link in the delivery chain, promoted from a playbook's
 // in-scope epics (or added manually). Lineage: sourcePlaybookId + sourceVersion.
 export const epic = pgTable(

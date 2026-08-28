@@ -3,11 +3,12 @@
 import { and, asc, desc, eq } from "drizzle-orm";
 import { getActiveMembership, canCreateProject, canManageOrg } from "@/lib/auth-server";
 import { db } from "@/lib/db";
-import { project, epic, story, techDoc, projectCompliance, testPlan, testPlanApprover, testCase, testRun, aiGeneration, member } from "@/lib/db/schema";
+import { project, epic, story, techDoc, projectCompliance, testPlan, testPlanApprover, testCase, testRun, testCredential, aiGeneration, member } from "@/lib/db/schema";
 import { generateTestCasesForStories } from "@/lib/ai/generate";
 import { LLMConfigError } from "@/lib/ai/provider";
 import { getTestRunner, runnerForCategory, caseToFeature } from "@/lib/testing";
 import type { TestRunResult } from "@/lib/testing";
+import { encryptSecret } from "@/lib/crypto";
 
 type TddContent = { architectureOverview?: string; apis?: Array<{ method: string; path: string; purpose: string }>; securityPrivacy?: string };
 
@@ -434,4 +435,36 @@ export async function runApiSuite(projectId: string, suite: string, opts: RunOpt
     results.push({ caseId: tc.id, title: tc.title, status: result.status });
   }
   return { ok: true, results };
+}
+
+// ---- test credentials (encrypted; the UI agent injects these) ----
+
+export async function addTestCredential(projectId: string, input: { name: string; kind: string; targetUrl?: string; username?: string; secret?: string; notes?: string }) {
+  const ctx = await loadProjectCtx(projectId);
+  if (!ctx?.canWork) return { error: "Not allowed." };
+  if (!input.name?.trim()) return { error: "A name is required." };
+  await db.insert(testCredential).values({
+    id: crypto.randomUUID(),
+    organizationId: ctx.m.orgId!,
+    projectId,
+    name: input.name.trim(),
+    kind: input.kind === "token" ? "token" : "login",
+    targetUrl: input.targetUrl?.trim() || null,
+    username: input.username?.trim() || null,
+    secret: input.secret ? encryptSecret(input.secret) : null,
+    notes: input.notes?.trim() || null,
+    createdBy: ctx.m.userId,
+  });
+  return { ok: true };
+}
+
+export async function deleteTestCredential(credentialId: string) {
+  const m = await getActiveMembership();
+  if (!m?.orgId) return { error: "Not allowed." };
+  const c = (await db.select().from(testCredential).where(eq(testCredential.id, credentialId)).limit(1))[0];
+  if (!c || c.organizationId !== m.orgId) return { error: "Not found." };
+  const ctx = await loadProjectCtx(c.projectId);
+  if (!ctx?.canWork) return { error: "Not allowed." };
+  await db.delete(testCredential).where(eq(testCredential.id, credentialId));
+  return { ok: true };
 }

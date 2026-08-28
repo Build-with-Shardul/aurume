@@ -3,7 +3,8 @@ import Link from "next/link";
 import { and, asc, desc, eq } from "drizzle-orm";
 import { getActiveMembership, canCreateProject } from "@/lib/auth-server";
 import { db } from "@/lib/db";
-import { project, epic, story, testPlan, testPlanApprover, testCase, testRun, aiGeneration, member, user } from "@/lib/db/schema";
+import { project, epic, story, testPlan, testPlanApprover, testCase, testRun, testCredential, aiGeneration, member, user } from "@/lib/db/schema";
+import { getConnector } from "@/lib/connectors";
 import { currentProvider, MODEL_OPTIONS, defaultModel } from "@/lib/ai/provider";
 import TestsWorkspace, { type TestCaseView, type TestPlanView, type StoryCoverage } from "./tests-client";
 
@@ -113,6 +114,13 @@ export default async function TestsPage({ params }: { params: Promise<{ id: stri
   const epicList = epics.map((e) => ({ id: e.id, name: e.name }));
   const storyList = storyRows.map((s) => ({ id: s.id, title: s.title }));
 
+  const credentials = (await db
+    .select({ id: testCredential.id, name: testCredential.name, kind: testCredential.kind, username: testCredential.username, targetUrl: testCredential.targetUrl })
+    .from(testCredential)
+    .where(eq(testCredential.projectId, id))).map((c) => ({ ...c, hasSecret: true }));
+  const bb = await getConnector(m.orgId!, "browserbase").catch(() => null);
+  const browserbaseConnected = !!bb?.secret;
+
   return (
     <main className="min-h-screen bg-neutral-50 text-neutral-900">
       <header className="border-b border-neutral-200 bg-white">
@@ -140,6 +148,8 @@ export default async function TestsPage({ params }: { params: Promise<{ id: stri
             meId={m.userId}
             modelInfo={modelInfo}
             generationLog={generationLog}
+            credentials={credentials}
+            browserbaseConnected={browserbaseConnected}
           />
         </div>
       </div>
