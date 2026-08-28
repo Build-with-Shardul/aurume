@@ -8,7 +8,8 @@ import { generateTestCasesForStories } from "@/lib/ai/generate";
 import { LLMConfigError } from "@/lib/ai/provider";
 import { getTestRunner, runnerForCategory, caseToFeature } from "@/lib/testing";
 import type { TestRunResult } from "@/lib/testing";
-import { encryptSecret } from "@/lib/crypto";
+import { encryptSecret, decryptSecret } from "@/lib/crypto";
+import type { RunCredential } from "@/lib/testing";
 
 type TddContent = { architectureOverview?: string; apis?: Array<{ method: string; path: string; purpose: string }>; securityPrivacy?: string };
 
@@ -395,11 +396,21 @@ export async function runTestCase(caseId: string, opts: RunOpts = {}) {
   const feature = caseToFeature({ title: tc.title, preconditions: tc.preconditions, steps: (tc.steps as string[]) ?? [] });
   const runner = getTestRunner(runnerId, { orgId: ctx.m.orgId!, model: opts.model });
 
+  // UI agent gets the project's decrypted credentials to inject at run time.
+  let credentials: RunCredential[] | undefined;
+  if (runnerId === "ui") {
+    credentials = (await db.select().from(testCredential).where(eq(testCredential.projectId, tc.projectId))).map((c) => ({
+      name: c.name,
+      username: c.username,
+      secret: c.secret ? decryptSecret(c.secret) : null,
+    }));
+  }
+
   let result: TestRunResult;
   try {
     result = await runner.run(
       { id: tc.id, title: tc.title, feature, baseUrl: opts.baseUrl },
-      { baseUrl: opts.baseUrl, auth: opts.bearer ? { bearer: opts.bearer } : undefined },
+      { baseUrl: opts.baseUrl, auth: opts.bearer ? { bearer: opts.bearer } : undefined, credentials },
     );
   } catch (e) {
     if (e instanceof LLMConfigError) return { error: e.message };

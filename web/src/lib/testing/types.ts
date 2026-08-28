@@ -39,10 +39,14 @@ export type TestCase = {
 
 export type RunAuth = { bearer?: string; headers?: Array<{ name: string; value: string }> };
 
+export type RunCredential = { name: string; username: string | null; secret: string | null };
+
 export type RunOptions = {
   model?: string; // BYO-key model the engine should use
   baseUrl?: string; // overrides TestCase.baseUrl
-  auth?: RunAuth; // credentials injected into requests
+  auth?: RunAuth; // credentials injected into API requests
+  credentials?: RunCredential[]; // decrypted test credentials for the UI agent to inject
+  maxSteps?: number; // UI agent step cap
   timeoutMs?: number;
   signal?: AbortSignal;
 };

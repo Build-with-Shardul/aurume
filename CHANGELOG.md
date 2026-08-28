@@ -27,10 +27,18 @@ schema, and behavior can change between pre-releases.
   encrypted, never sent to the client), a config-gated **`ui` runner** behind the same
   `TestRunner` interface (`ui`/`accessibility` cases route to it; clear "connect
   Browserbase" message until keyed), and a **Testing engine & credentials** panel on the
-  Test Cases page (runner status + credential manager). The perceive→plan→act agent loop
-  (accessibility-tree grounding, live-view streaming) is built next against a real
-  target app. New table: `test_credential`. Verified: credential round-trips encrypted
-  (never plaintext at rest), connector + panel render, UI cases gate correctly.
+  Test Cases page (runner status + credential manager). New table: `test_credential`.
+- **UI testing agent — the browser agent loop (Browserbase)** — a UI test case now runs
+  in a live cloud browser: the runner creates a Browserbase session, connects Playwright
+  over CDP, and drives a **perceive → plan → act → observe** loop — the page's
+  **accessibility tree** (`ariaSnapshot`) + the Gherkin go to the model, which picks one
+  grounded action at a time (navigate / click / fill / press / select / assert), targeted
+  by **ARIA role + accessible name** so it survives DOM churn. **Test credentials are
+  injected** via a `<<secret:NAME>>` token the runner substitutes at type-time (the model
+  never sees the secret). Returns per-step verdicts + a **Browserbase live-view / replay
+  URL** to watch it. Verified live end-to-end: logged into a real site (credential
+  injected) and asserted the post-login page — **passed in ~38s**. Real-time in-app
+  live-view embedding (vs. the replay link) comes with the async worker.
 - **Test Cases (AI test-case corpus + coverage)** — the story-to-tests link, a
   first-class artifact like the Playbook/TDD (`/projects/[id]/tests`, card below
   Epics). AI-generates comprehensive cases across **happy path, edge, negative, API,

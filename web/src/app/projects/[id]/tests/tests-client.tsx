@@ -361,6 +361,9 @@ function CaseRow({ c, canWork, storyTitle, run, busy, runCfg }: { c: TestCaseVie
       {runRes && (
         <div className="mt-2 rounded border border-neutral-200 px-3 py-2 text-xs">
           <div>Run: <span className={`font-medium ${runText(runRes.status)}`}>{runRes.status}</span>{runRes.durationMs != null ? ` · ${runRes.durationMs}ms` : ""} <span className="text-neutral-400">· {runRes.runner}</span></div>
+          {runRes.artifacts.filter((a) => a.url).map((a, i) => (
+            <div key={`art-${i}`} className="mt-1"><a href={a.url} target="_blank" rel="noopener" className="text-blue-600 underline">▶ {a.note || "Live view / replay"}</a></div>
+          ))}
           {runRes.steps.map((s, i) => (
             <div key={i} className="mt-1">
               <span className={runText(s.status)}>{runMark(s.status)}</span> <span className="text-neutral-700">{s.text}</span>
