@@ -1,7 +1,7 @@
 import { redirect, notFound } from "next/navigation";
 import Link from "next/link";
 import { desc, eq } from "drizzle-orm";
-import { getActiveMembership, canCreateProject, canManageOrg } from "@/lib/auth-server";
+import { getActiveMembership, canCreateProject } from "@/lib/auth-server";
 import { db } from "@/lib/db";
 import { project, feature, playbook, playbookApprover, member, user, projectCompliance, aiGeneration } from "@/lib/db/schema";
 import { currentProvider, MODEL_OPTIONS, defaultModel } from "@/lib/ai/provider";
@@ -44,7 +44,6 @@ export default async function FeaturesPage({ params }: { params: Promise<{ id: s
     .where(eq(member.organizationId, m.orgId!));
 
   const canWork = canCreateProject(m.role) || p.createdBy === m.userId;
-  const isOrgAdmin = canManageOrg(m.role);
 
   const approverRows = pb
     ? await db

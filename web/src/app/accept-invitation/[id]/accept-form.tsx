@@ -8,7 +8,6 @@ import { applyInvitationDiscipline } from "./actions";
 export default function AcceptForm({
   invitationId,
   email,
-  role,
 }: {
   invitationId: string;
   email: string;

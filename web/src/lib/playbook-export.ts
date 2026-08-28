@@ -8,7 +8,6 @@ import {
   TableRow,
   TableCell,
   WidthType,
-  AlignmentType,
 } from "docx";
 import PDFDocument from "pdfkit";
 import type { PlaybookContent } from "./ai/playbook";
@@ -117,7 +116,6 @@ export function buildPlaybookPdf(d: PlaybookDocData): Promise<Buffer> {
     const h2 = (t: string) => { doc.moveDown(0.8).font("Helvetica-Bold").fontSize(13).fillColor("#111").text(t); doc.moveDown(0.2); doc.font("Helvetica").fontSize(10).fillColor("#333"); };
     const para = (t: string) => { doc.font("Helvetica").fontSize(10).fillColor("#333").text(t || "—", { width: W }); };
     const kv = (k: string, v: string) => { doc.font("Helvetica-Bold").fontSize(9).fillColor("#555").text(`${k}: `, { continued: true }).font("Helvetica").fillColor("#333").text(v); };
-    const entry = (title: string, body?: string) => { doc.font("Helvetica-Bold").fontSize(10).fillColor("#111").text(`• ${title}`, { width: W }); if (body) doc.font("Helvetica").fontSize(9.5).fillColor("#444").text(body, { width: W, indent: 12 }); doc.moveDown(0.2); };
 
     // A bordered grid table with a colored header row.
     const drawTable = (headers: string[], rows: string[][], fractions: number[]) => {

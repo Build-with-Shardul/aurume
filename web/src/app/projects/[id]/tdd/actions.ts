@@ -3,7 +3,7 @@
 import { and, desc, eq } from "drizzle-orm";
 import { getActiveMembership, canCreateProject, canManageOrg } from "@/lib/auth-server";
 import { db } from "@/lib/db";
-import { techDoc, techDocApprover, playbook, feature, projectCompliance, aiGeneration, project, member, user } from "@/lib/db/schema";
+import { techDoc, techDocApprover, playbook, feature, projectCompliance, aiGeneration, project, member } from "@/lib/db/schema";
 import { generateTechDocDraft } from "@/lib/ai/generate";
 import { LLMConfigError } from "@/lib/ai/provider";
 import { TechDocContentSchema } from "@/lib/ai/techdoc";

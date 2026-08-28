@@ -15,7 +15,10 @@ schema, and behavior can change between pre-releases.
   every page **full width**. New `AppSidebar`/`AppChrome` mounted in the root layout
   (shown only when authenticated; login/setup/accept-invitation stay bare); collapse
   state persists. Added minimal **Profile** and **My role** settings pages. Browser tab
-  title is now "Aurume".
+  title is now "Aurume". The sidebar shows a **project sub-nav** when you're inside a
+  project (Overview, Plan, Knowledge, Features & playbook, Design → code, Tech design
+  doc, Epics, Test cases, Settings) with the active section highlighted. Also swept all
+  unused-variable lint warnings (0 remaining).
 
 ### Added
 - **Testing engine — pluggable runner + API executor (Phase 0/1)** — the execution

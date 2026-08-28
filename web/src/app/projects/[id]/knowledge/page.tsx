@@ -1,7 +1,7 @@
 import { redirect, notFound } from "next/navigation";
 import Link from "next/link";
 import { desc, eq } from "drizzle-orm";
-import { getActiveMembership, canManageOrg } from "@/lib/auth-server";
+import { getActiveMembership } from "@/lib/auth-server";
 import { db } from "@/lib/db";
 import { project, knowledgeItem, user } from "@/lib/db/schema";
 import { canDeleteItem } from "@/lib/knowledge";

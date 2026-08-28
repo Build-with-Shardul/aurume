@@ -1,7 +1,7 @@
 import { redirect, notFound } from "next/navigation";
 import Link from "next/link";
 import { eq } from "drizzle-orm";
-import { getActiveMembership, canManageOrg } from "@/lib/auth-server";
+import { getActiveMembership } from "@/lib/auth-server";
 import { db } from "@/lib/db";
 import { project, projectMember, knowledgeItem, feature, epic } from "@/lib/db/schema";
 import { formatBudget } from "@/lib/currencies";
@@ -28,7 +28,6 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
     await db.select({ id: epic.id }).from(epic).where(eq(epic.projectId, id))
   ).length;
 
-  const canManage = canManageOrg(m.role) || p.createdBy === m.userId;
   const started = isProjectStarted(p.startDate);
 
   return (

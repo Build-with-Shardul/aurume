@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { dayDiff, parseISO, toISO, type Plan } from "@/lib/schedule";
+import { parseISO, toISO, type Plan } from "@/lib/schedule";
 import { formatBudget } from "@/lib/currencies";
 
 type Verdict = { ok: boolean | null; unknown: boolean };
@@ -64,7 +64,7 @@ export default function PlanClient({ plan, project, members, leaves, budget, tim
   if (project.startDate) dates.push(project.startDate);
   const sorted = [...dates].sort();
   const rangeStart = sorted[0] ?? project.startDate ?? new Date().toISOString().slice(0, 10);
-  let rangeEnd = sorted[sorted.length - 1] ?? rangeStart;
+  const rangeEnd = sorted[sorted.length - 1] ?? rangeStart;
   // extend a little past the last bar for breathing room, and to fit the expected-end marker if close
   const cols = buildColumns(rangeStart, rangeEnd);
   const idxOfStart = (iso: string) => { const i = cols.findIndex((c) => c.iso >= iso.slice(0, 10)); return i < 0 ? cols.length - 1 : i; };
