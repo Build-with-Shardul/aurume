@@ -79,13 +79,13 @@ export default function AppSidebar({
     { href: "/projects", label: "Projects", icon: "📁" },
     { href: "/knowledge", label: "Org knowledge", icon: "📚" },
     { href: "/resources", label: "Resources", icon: "🧑‍💻" },
-    ...(canManage ? [{ href: "/admin/people", label: "Manage people", icon: "👥" }] : []),
-    { href: "/usage", label: "AI usage", icon: "📈" },
   ];
   const settings: NavItem[] = [
     { href: "/settings/profile", label: "Profile", icon: "👤" },
     { href: "/settings/role", label: "My role", icon: "🛡️" },
     { href: "/settings/connectors", label: "Connectors", icon: "🔌" },
+    ...(canManage ? [{ href: "/admin/people", label: "Manage people", icon: "👥" }] : []),
+    { href: "/usage", label: "AI usage", icon: "📈" },
   ];
 
   const isActive = (href: string) => pathname === href || pathname.startsWith(href + "/");

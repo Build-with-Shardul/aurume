@@ -24,11 +24,12 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
   const m = session ? await getActiveMembership() : null;
   const instanceAdmin = session ? await isInstanceAdmin().catch(() => false) : false;
   const user = { name: session?.user.name ?? "", email: session?.user.email ?? "" };
+  const impersonatedBy = (session?.session as { impersonatedBy?: string | null } | undefined)?.impersonatedBy ?? null;
 
   return (
     <html lang="en" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
       <body className="min-h-full">
-        <AppChrome authed={!!m?.orgId} user={user} role={m?.role ?? null} canManage={canManageOrg(m?.role ?? null)} instanceAdmin={instanceAdmin}>
+        <AppChrome authed={!!m?.orgId} user={user} role={m?.role ?? null} canManage={canManageOrg(m?.role ?? null)} instanceAdmin={instanceAdmin} impersonating={!!impersonatedBy}>
           {children}
         </AppChrome>
       </body>

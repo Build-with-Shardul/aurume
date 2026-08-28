@@ -21,10 +21,7 @@ export default async function ProjectsPage() {
     <main className="min-h-screen bg-neutral-50 text-neutral-900">
       <div className="w-full px-6 py-10">
         <div className="flex items-center justify-between">
-          <div>
-            <Link href="/" className="text-sm text-neutral-500 hover:text-neutral-900">← Back</Link>
-            <h1 className="mt-3 text-2xl font-semibold">Projects</h1>
-          </div>
+          <h1 className="text-2xl font-semibold">Projects</h1>
           {canCreate && (
             <Link href="/projects/new" className="rounded-lg bg-neutral-900 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-800">
               + New project

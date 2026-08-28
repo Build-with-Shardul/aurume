@@ -2,6 +2,7 @@
 
 import { usePathname } from "next/navigation";
 import AppSidebar from "./app-sidebar";
+import StopImpersonatingButton from "@/app/stop-impersonating-button";
 
 // Routes that render without the app shell (unauthenticated / full-bleed).
 const BARE = ["/login", "/setup", "/accept-invitation"];
@@ -12,6 +13,7 @@ export default function AppChrome({
   role,
   canManage,
   instanceAdmin,
+  impersonating,
   children,
 }: {
   authed: boolean;
@@ -19,6 +21,7 @@ export default function AppChrome({
   role: string | null;
   canManage: boolean;
   instanceAdmin: boolean;
+  impersonating: boolean;
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
@@ -27,7 +30,14 @@ export default function AppChrome({
   return (
     <div className="flex min-h-screen w-full bg-neutral-50 text-neutral-900">
       <AppSidebar user={user} role={role} canManage={canManage} instanceAdmin={instanceAdmin} />
-      <div className="min-w-0 flex-1">{children}</div>
+      <div className="min-w-0 flex-1">
+        {impersonating && (
+          <div className="bg-amber-100 px-6 py-2 text-center text-sm text-amber-900">
+            You&apos;re impersonating <strong>{user.email}</strong>. <StopImpersonatingButton />
+          </div>
+        )}
+        {children}
+      </div>
     </div>
   );
 }
