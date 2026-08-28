@@ -1,5 +1,6 @@
 "use server";
 
+import { after } from "next/server";
 import { and, asc, desc, eq } from "drizzle-orm";
 import { getActiveMembership, canCreateProject, canManageOrg } from "@/lib/auth-server";
 import { db } from "@/lib/db";
@@ -7,9 +8,11 @@ import { project, epic, story, techDoc, projectCompliance, testPlan, testPlanApp
 import { generateTestCasesForStories } from "@/lib/ai/generate";
 import { LLMConfigError } from "@/lib/ai/provider";
 import { getTestRunner, runnerForCategory, caseToFeature } from "@/lib/testing";
-import type { TestRunResult } from "@/lib/testing";
+import type { TestRunResult, RunCredential, TestStep } from "@/lib/testing";
 import { encryptSecret, decryptSecret } from "@/lib/crypto";
-import type { RunCredential } from "@/lib/testing";
+import { getConnector } from "@/lib/connectors";
+import { createSession, getLiveViewUrl, endSession } from "@/lib/testing/browserbase";
+import { driveUiAgent } from "@/lib/testing/ui-agent-loop";
 
 type TddContent = { architectureOverview?: string; apis?: Array<{ method: string; path: string; purpose: string }>; securityPrivacy?: string };
 
@@ -478,4 +481,115 @@ export async function deleteTestCredential(credentialId: string) {
   if (!ctx?.canWork) return { error: "Not allowed." };
   await db.delete(testCredential).where(eq(testCredential.id, credentialId));
   return { ok: true };
+}
+
+// ---- async UI runs (live, watchable) ----
+
+async function loadCredsForProject(projectId: string): Promise<RunCredential[]> {
+  return (await db.select().from(testCredential).where(eq(testCredential.projectId, projectId))).map((c) => ({
+    name: c.name,
+    username: c.username,
+    secret: c.secret ? decryptSecret(c.secret) : null,
+  }));
+}
+
+/** Runs the agent loop in the background, streaming steps into the test_run row. Detached. */
+async function executeUiRun(p: { runId: string; orgId: string; model?: string; apiKey: string; projectId: string; session: { id: string; connectUrl: string }; feature: string; baseUrl?: string; credentials: RunCredential[] }) {
+  const started = Date.now();
+  try {
+    const { status, steps } = await driveUiAgent({
+      connectUrl: p.session.connectUrl,
+      orgId: p.orgId,
+      model: p.model,
+      feature: p.feature,
+      baseUrl: p.baseUrl,
+      credentials: p.credentials,
+      onStep: async (steps: TestStep[]) => {
+        await db.update(testRun).set({ steps }).where(eq(testRun.id, p.runId));
+      },
+    });
+    await db.update(testRun).set({ status, steps, durationMs: Date.now() - started, finishedAt: new Date() }).where(eq(testRun.id, p.runId));
+  } catch (e) {
+    await db.update(testRun).set({ status: "error", error: e instanceof Error ? e.message : String(e), durationMs: Date.now() - started, finishedAt: new Date() }).where(eq(testRun.id, p.runId));
+  } finally {
+    await endSession(p.apiKey, p.projectId, p.session.id);
+  }
+}
+
+/** Start a watchable UI run: creates the session, returns the live-view URL + runId immediately, runs in the background. */
+export async function startUiRun(caseId: string, opts: { baseUrl?: string; model?: string } = {}) {
+  const ctx = await caseCtx(caseId);
+  if (!ctx?.canWork) return { error: "Not allowed." };
+  const tc = ctx.testCase;
+  if (runnerForCategory(tc.category) !== "ui") return { error: "This isn't a UI/accessibility case." };
+
+  const conn = await getConnector(ctx.m.orgId!, "browserbase").catch(() => null);
+  const apiKey = conn?.secret;
+  const bbProject = conn?.config?.projectId;
+  if (!apiKey || !bbProject) return { error: "Connect Browserbase first: Settings → Connectors → Browserbase." };
+
+  let session;
+  try { session = await createSession(apiKey, bbProject); }
+  catch (e) { return { error: e instanceof Error ? e.message : "Couldn't start a browser session." }; }
+  const liveViewUrl = await getLiveViewUrl(apiKey, session.id);
+
+  const runId = crypto.randomUUID();
+  await db.insert(testRun).values({
+    id: runId, organizationId: ctx.m.orgId!, projectId: tc.projectId, testCaseId: tc.id, testPlanId: tc.testPlanId,
+    runner: "ui", status: "running", baseUrl: opts.baseUrl ?? null, liveViewUrl: liveViewUrl ?? null, sessionId: session.id,
+    steps: [], artifacts: [{ kind: "report", url: `https://www.browserbase.com/sessions/${session.id}`, note: "Session replay (review after the run)" }],
+    triggeredBy: ctx.m.userId,
+  });
+
+  const credentials = await loadCredsForProject(tc.projectId);
+  const feature = caseToFeature({ title: tc.title, preconditions: tc.preconditions, steps: (tc.steps as string[]) ?? [] });
+  after(() => executeUiRun({ runId, orgId: ctx.m.orgId!, model: opts.model, apiKey, projectId: bbProject, session, feature, baseUrl: opts.baseUrl, credentials }));
+
+  return { ok: true, runId, liveViewUrl };
+}
+
+export async function getRunStatus(runId: string) {
+  const m = await getActiveMembership();
+  if (!m?.orgId) return { error: "Not allowed." };
+  const r = (await db.select().from(testRun).where(eq(testRun.id, runId)).limit(1))[0];
+  if (!r || r.organizationId !== m.orgId) return { error: "Not found." };
+  return { ok: true, status: r.status, steps: (r.steps as TestStep[]) ?? [], durationMs: r.durationMs, liveViewUrl: r.liveViewUrl, sessionId: r.sessionId, error: r.error };
+}
+
+/** Launch a UI suite: parallel watchable runs for the suite's UI cases (capped for Browserbase concurrency). */
+export async function startUiSuite(projectId: string, suite: string, opts: { baseUrl?: string; model?: string } = {}) {
+  const ctx = await loadProjectCtx(projectId);
+  if (!ctx?.canWork) return { error: "Not allowed." };
+  const plan = await latestPlan(projectId);
+  if (!plan) return { error: "No test plan yet." };
+
+  const conn = await getConnector(ctx.m.orgId!, "browserbase").catch(() => null);
+  const apiKey = conn?.secret;
+  const bbProject = conn?.config?.projectId;
+  if (!apiKey || !bbProject) return { error: "Connect Browserbase first: Settings → Connectors → Browserbase." };
+
+  const all = (await db.select().from(testCase).where(eq(testCase.testPlanId, plan.id)))
+    .filter((c) => ["ui", "accessibility"].includes(c.category) && (suite === "all" ? true : ((c.suites as string[]) ?? []).includes(suite)));
+  if (!all.length) return { error: `No UI cases in the ${suite} suite.` };
+  const CAP = 5;
+  const cases = all.slice(0, CAP);
+
+  const credentials = await loadCredsForProject(projectId);
+  const batchId = crypto.randomUUID();
+  const runs: Array<{ runId: string; caseId: string; title: string; liveViewUrl: string | null }> = [];
+  for (const tc of cases) {
+    let session;
+    try { session = await createSession(apiKey, bbProject); } catch { continue; }
+    const liveViewUrl = await getLiveViewUrl(apiKey, session.id);
+    const runId = crypto.randomUUID();
+    await db.insert(testRun).values({
+      id: runId, organizationId: ctx.m.orgId!, projectId, testCaseId: tc.id, testPlanId: plan.id, batchId, runner: "ui", suite,
+      status: "running", baseUrl: opts.baseUrl ?? null, liveViewUrl: liveViewUrl ?? null, sessionId: session.id,
+      steps: [], artifacts: [{ kind: "report", url: `https://www.browserbase.com/sessions/${session.id}`, note: "Session replay" }], triggeredBy: ctx.m.userId,
+    });
+    const feature = caseToFeature({ title: tc.title, preconditions: tc.preconditions, steps: (tc.steps as string[]) ?? [] });
+    after(() => executeUiRun({ runId, orgId: ctx.m.orgId!, model: opts.model, apiKey, projectId: bbProject, session, feature, baseUrl: opts.baseUrl, credentials }));
+    runs.push({ runId, caseId: tc.id, title: tc.title, liveViewUrl });
+  }
+  return { ok: true, batchId, runs, truncated: all.length > CAP ? all.length - CAP : 0 };
 }

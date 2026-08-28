@@ -565,6 +565,8 @@ export const testRun = pgTable(
     suite: text("suite"), // the suite selection that triggered it, if any
     status: text("status").notNull().default("queued"), // queued | running | passed | failed | error | skipped
     baseUrl: text("base_url"),
+    liveViewUrl: text("live_view_url"), // Browserbase live view, embeddable while running
+    sessionId: text("session_id"),
     steps: jsonb("steps").notNull().default([]), // [{ text, status, detail }]
     artifacts: jsonb("artifacts").notNull().default([]), // [{ kind, note, url, path }]
     logs: text("logs"),

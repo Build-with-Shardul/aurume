@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   generateProjectTestCases,
@@ -12,10 +12,16 @@ import {
   setTestPlanApprovers,
   approveTestPlan,
   runTestCase,
+  startUiRun,
+  startUiSuite,
+  getRunStatus,
   addTestCredential,
   deleteTestCredential,
 } from "./actions";
-import type { TestRunResult } from "@/lib/testing";
+import type { TestRunResult, TestStep } from "@/lib/testing";
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+const stepMark = (s: string) => (s === "passed" ? "✓" : s === "failed" ? "✗" : s === "error" ? "!" : "•");
 
 export type CredentialView = { id: string; name: string; kind: string; username: string | null; targetUrl: string | null; hasSecret: boolean };
 const RUNNABLE = new Set(["api", "ui", "accessibility"]);
@@ -92,6 +98,8 @@ export default function TestsWorkspace({
   const [showApprovers, setShowApprovers] = useState(false);
   const [baseUrl, setBaseUrl] = useState("");
   const [bearer, setBearer] = useState("");
+  const [batch, setBatch] = useState<Array<{ runId: string; title: string; liveViewUrl: string | null }> | null>(null);
+  const [batchBusy, setBatchBusy] = useState(false);
 
   async function run<T>(key: string, fn: () => Promise<T & { error?: string }>) {
     setBusy(key); setError(null);
@@ -242,7 +250,16 @@ export default function TestsWorkspace({
         <input value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} placeholder="Base URL — https://api.example.com" className="w-64 rounded border border-neutral-300 px-2 py-1" />
         <input value={bearer} onChange={(e) => setBearer(e.target.value)} placeholder="Bearer token (optional)" type="password" className="w-48 rounded border border-neutral-300 px-2 py-1" />
         <span className="text-neutral-400">API cases execute here; UI cases run via the browser agent (Browserbase).</span>
+        {browserbaseConnected && canWork && (
+          <button
+            onClick={async () => { setBatchBusy(true); setError(null); const r = await startUiSuite(projectId, suiteFilter, { baseUrl: baseUrl || undefined, model }); setBatchBusy(false); if (r && "runs" in r && r.runs) setBatch(r.runs); else if (r && "error" in r) setError(r.error ?? null); }}
+            disabled={batchBusy}
+            className="ml-auto rounded-lg bg-neutral-900 px-3 py-1 font-medium text-white disabled:opacity-40"
+          >{batchBusy ? "Launching…" : `▶ Run UI ${suiteFilter} suite`}</button>
+        )}
       </div>
+
+      {batch && <LiveBatch runs={batch} onClose={() => setBatch(null)} />}
 
       <EnginePanel projectId={projectId} browserbaseConnected={browserbaseConnected} credentials={credentials} canWork={canWork} run={run} busy={busy} />
 
@@ -296,13 +313,31 @@ function CaseRow({ c, canWork, storyTitle, run, busy, runCfg }: { c: TestCaseVie
   const [running, setRunning] = useState(false);
   const [runRes, setRunRes] = useState<TestRunResult | null>(null);
   const [runErr, setRunErr] = useState<string | null>(null);
+  const [live, setLive] = useState<{ url: string | null; status: string; steps: TestStep[]; sessionId: string | null } | null>(null);
+  const isUi = c.category === "ui" || c.category === "accessibility";
 
   async function doRun() {
-    setRunning(true); setRunErr(null); setRunRes(null);
+    setRunning(true); setRunErr(null); setRunRes(null); setLive(null);
     try {
-      const r = await runTestCase(c.id, { baseUrl: runCfg.baseUrl || undefined, bearer: runCfg.bearer || undefined, model: runCfg.model });
-      if (r && "error" in r && r.error) setRunErr(r.error);
-      else if (r && "result" in r && r.result) setRunRes(r.result);
+      if (isUi) {
+        const r = await startUiRun(c.id, { baseUrl: runCfg.baseUrl || undefined, model: runCfg.model });
+        if (r && "error" in r && r.error) { setRunErr(r.error); return; }
+        if (!(r && "runId" in r && r.runId)) return;
+        setLive({ url: r.liveViewUrl ?? null, status: "running", steps: [], sessionId: null });
+        for (;;) {
+          await sleep(2000);
+          const s = await getRunStatus(r.runId);
+          if (s && "error" in s && s.error) { setRunErr(s.error); break; }
+          if (s && "status" in s && s.status) {
+            setLive((prev) => ({ url: prev?.url ?? r.liveViewUrl ?? null, status: s.status!, steps: (s.steps as TestStep[]) ?? [], sessionId: s.sessionId ?? null }));
+            if (s.status !== "running") break;
+          }
+        }
+      } else {
+        const r = await runTestCase(c.id, { baseUrl: runCfg.baseUrl || undefined, bearer: runCfg.bearer || undefined, model: runCfg.model });
+        if (r && "error" in r && r.error) setRunErr(r.error);
+        else if (r && "result" in r && r.result) setRunRes(r.result);
+      }
     } catch (e) {
       setRunErr(e instanceof Error ? e.message : "Run failed.");
     } finally {
@@ -371,6 +406,23 @@ function CaseRow({ c, canWork, storyTitle, run, busy, runCfg }: { c: TestCaseVie
             </div>
           ))}
           {runRes.error && <div className="mt-1 text-red-600">{runRes.error}</div>}
+        </div>
+      )}
+      {live && (
+        <div className="mt-2 rounded border border-neutral-200 px-3 py-2 text-xs">
+          <div className="flex flex-wrap items-center gap-3">
+            <span>Run: <span className={`font-medium ${runText(live.status)}`}>{live.status === "running" ? "running…" : live.status}</span> <span className="text-neutral-400">· ui</span></span>
+            {live.sessionId && <a href={`https://www.browserbase.com/sessions/${live.sessionId}`} target="_blank" rel="noopener" className="text-blue-600 underline">▶ Session replay</a>}
+          </div>
+          {live.status === "running" && live.url && (
+            <iframe src={live.url} title="Live browser session" className="mt-2 h-72 w-full rounded border border-neutral-200 bg-white" sandbox="allow-scripts allow-same-origin allow-forms" />
+          )}
+          <div className="mt-2 space-y-0.5">
+            {live.steps.map((s, i) => (
+              <div key={i}><span className={runText(s.status)}>{stepMark(s.status)}</span> <span className="text-neutral-700">{s.text}</span>{s.detail && <span className="text-neutral-400"> — {s.detail}</span>}</div>
+            ))}
+            {live.status === "running" && <div className="text-neutral-400">agent working…</div>}
+          </div>
         </div>
       )}
     </div>
@@ -464,6 +516,52 @@ function EnginePanel({ projectId, browserbaseConnected, credentials, canWork, ru
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function LiveBatch({ runs, onClose }: { runs: Array<{ runId: string; title: string; liveViewUrl: string | null }>; onClose: () => void }) {
+  return (
+    <div className="rounded-xl border border-neutral-200 bg-white p-4">
+      <div className="flex items-center justify-between">
+        <span className="text-sm font-medium">Live UI suite run — {runs.length} in parallel</span>
+        <button onClick={onClose} className="text-xs text-neutral-500 hover:text-neutral-900">Close</button>
+      </div>
+      <div className="mt-3 grid gap-3 md:grid-cols-2">
+        {runs.map((r) => <LiveRunCard key={r.runId} run={r} />)}
+      </div>
+    </div>
+  );
+}
+
+function LiveRunCard({ run }: { run: { runId: string; title: string; liveViewUrl: string | null } }) {
+  const [status, setStatus] = useState("running");
+  const [steps, setSteps] = useState<TestStep[]>([]);
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      for (;;) {
+        await sleep(2500);
+        if (!alive) return;
+        const s = await getRunStatus(run.runId);
+        if (s && "status" in s && s.status) {
+          setStatus(s.status); setSteps((s.steps as TestStep[]) ?? []); setSessionId(s.sessionId ?? null);
+          if (s.status !== "running") return;
+        } else return;
+      }
+    })();
+    return () => { alive = false; };
+  }, [run.runId]);
+  return (
+    <div className="rounded-lg border border-neutral-200 p-2 text-xs">
+      <div className="flex items-center justify-between gap-2">
+        <span className="truncate font-medium text-neutral-800" title={run.title}>{run.title}</span>
+        <span className={`shrink-0 rounded px-1.5 py-0.5 ${runTone(status)}`}>{status === "running" ? "running…" : status}</span>
+      </div>
+      {status === "running" && run.liveViewUrl && <iframe src={run.liveViewUrl} title={run.title} className="mt-2 h-48 w-full rounded border border-neutral-200 bg-white" sandbox="allow-scripts allow-same-origin allow-forms" />}
+      {status !== "running" && sessionId && <a href={`https://www.browserbase.com/sessions/${sessionId}`} target="_blank" rel="noopener" className="mt-1 inline-block text-blue-600 underline">▶ replay</a>}
+      <div className="mt-1 space-y-0.5">{steps.slice(-6).map((s, i) => <div key={i}><span className={runText(s.status)}>{stepMark(s.status)}</span> <span className="text-neutral-600">{s.text}</span></div>)}</div>
     </div>
   );
 }

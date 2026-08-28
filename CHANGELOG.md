@@ -37,8 +37,18 @@ schema, and behavior can change between pre-releases.
   injected** via a `<<secret:NAME>>` token the runner substitutes at type-time (the model
   never sees the secret). Returns per-step verdicts + a **Browserbase live-view / replay
   URL** to watch it. Verified live end-to-end: logged into a real site (credential
-  injected) and asserted the post-login page — **passed in ~38s**. Real-time in-app
-  live-view embedding (vs. the replay link) comes with the async worker.
+  injected) and asserted the post-login page — **passed in ~38s**.
+- **Watch the agent live — async runs + embedded live view + parallel suites** — a UI
+  run no longer blocks: `startUiRun` creates the Browserbase session, returns a runId +
+  live-view URL immediately, and drives the agent in the background (Next `after()`),
+  streaming each step into the `test_run` row. The Test Cases page **embeds the live
+  browser** (Browserbase live view in an iframe) while the run is in flight, streams the
+  steps as they happen, then swaps to the **Session replay** link on completion —
+  "load the app, watch the agent test it." A **▶ Run UI &lt;suite&gt; suite** button
+  launches the suite's UI cases **in parallel** (capped for Browserbase concurrency),
+  each with its own live tile. New `test_run` columns: `live_view_url`, `session_id`.
+  Verified live in-app: the embedded browser drove a real login and the run finished
+  **passed** with streamed steps + replay link.
 - **Test Cases (AI test-case corpus + coverage)** — the story-to-tests link, a
   first-class artifact like the Playbook/TDD (`/projects/[id]/tests`, card below
   Epics). AI-generates comprehensive cases across **happy path, edge, negative, API,
