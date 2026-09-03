@@ -46,7 +46,7 @@ export default async function KnowledgePage({ params }: { params: Promise<{ id: 
         <h1 className="mt-3 text-2xl font-semibold">Knowledge space</h1>
         <p className="mt-1 text-sm text-neutral-500">
           This project&apos;s knowledge. Aurume also draws on your{" "}
-          <Link href="/knowledge" className="font-medium text-neutral-900 underline">organization knowledge</Link>{" "}
+          <Link href="/knowledge" className="font-medium text-neutral-900 underline">workspace knowledge</Link>{" "}
           (every project&apos;s knowledge, rolled up) when drafting playbooks and other artifacts.
         </p>
 

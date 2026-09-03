@@ -26,6 +26,9 @@ export const user = pgTable("user", {
   banned: boolean("banned").default(false),
   banReason: text("ban_reason"),
   banExpires: timestamp("ban_expires"),
+  // Onboarding: captured on first sign-up (see /onboarding). Descriptive only.
+  onboardingRole: text("onboarding_role"), // e.g. product_manager, developer
+  onboardingIntent: text("onboarding_intent"), // e.g. roadmap, sprints, exploring
 });
 
 export const session = pgTable(
@@ -99,6 +102,7 @@ export const organization = pgTable(
     logo: text("logo"),
     createdAt: timestamp("created_at").notNull(),
     metadata: text("metadata"),
+    teamSize: text("team_size"), // onboarding bucket: 1 | 2-10 | 11-50 | 51-200 | 200+
   },
   (table) => [uniqueIndex("organization_slug_uidx").on(table.slug)],
 );

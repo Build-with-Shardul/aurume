@@ -77,7 +77,7 @@ export default function AppSidebar({
 
   const main: NavItem[] = [
     { href: "/projects", label: "Projects", icon: "📁" },
-    { href: "/knowledge", label: "Org knowledge", icon: "📚" },
+    { href: "/knowledge", label: "Workspace knowledge", icon: "📚" },
     { href: "/resources", label: "Resources", icon: "🧑‍💻" },
   ];
   const settings: NavItem[] = [

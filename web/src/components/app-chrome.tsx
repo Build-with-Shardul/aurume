@@ -6,7 +6,7 @@ import AppAssistant from "./app-assistant";
 import StopImpersonatingButton from "@/app/stop-impersonating-button";
 
 // Routes that render without the app shell (unauthenticated / full-bleed).
-const BARE = ["/login", "/setup", "/accept-invitation"];
+const BARE = ["/login", "/signup", "/verify", "/onboarding", "/setup", "/accept-invitation"];
 
 export default function AppChrome({
   authed,

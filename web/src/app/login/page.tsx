@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { signIn } from "@/lib/auth-client";
 
@@ -42,6 +43,10 @@ export default function LoginPage() {
           className="w-full rounded-lg bg-neutral-900 px-4 py-2.5 text-sm font-medium text-white hover:bg-neutral-800 disabled:opacity-50">
           {busy ? "Signing in…" : "Sign in"}
         </button>
+
+        <p className="mt-6 text-center text-sm text-neutral-500">
+          New to Aurume? <Link href="/signup" className="font-medium text-neutral-900 hover:underline">Create an account</Link>
+        </p>
       </form>
     </main>
   );

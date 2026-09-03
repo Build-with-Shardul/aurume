@@ -113,7 +113,7 @@ export default function SuperadminClient({ orgs, users, meId }: { orgs: Org[]; u
 
       {/* Organizations */}
       <div className="rounded-xl border border-neutral-200 bg-white">
-        <div className="border-b border-neutral-200 px-6 py-3 text-sm font-medium">Organizations ({orgs.length})</div>
+        <div className="border-b border-neutral-200 px-6 py-3 text-sm font-medium">Workspaces ({orgs.length})</div>
         <ul className="divide-y divide-neutral-100">
           {orgs.map((o) => (
             <li key={o.id} className="flex flex-wrap items-center justify-between gap-2 px-6 py-3 text-sm">

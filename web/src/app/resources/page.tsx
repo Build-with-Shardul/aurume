@@ -47,7 +47,7 @@ export default async function ResourcesPage() {
     <Shell>
       <Link href="/" className="text-sm text-neutral-500 hover:text-neutral-900">← Back</Link>
       <h1 className="mt-3 text-2xl font-semibold">Resources</h1>
-      <p className="mt-1 text-sm text-neutral-500">Everyone in the organization and the projects they&apos;re on. Open a resource to see their cross-project allocation and manage leave.</p>
+      <p className="mt-1 text-sm text-neutral-500">Everyone in the workspace and the projects they&apos;re on. Open a resource to see their cross-project allocation and manage leave.</p>
 
       <div className="mt-8 rounded-xl border border-neutral-200 bg-white">
         <table className="w-full border-collapse text-sm">

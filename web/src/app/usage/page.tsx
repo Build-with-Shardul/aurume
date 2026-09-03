@@ -27,7 +27,7 @@ export default async function UsagePage() {
       <Shell>
         <Link href="/" className="text-sm text-neutral-500 hover:text-neutral-900">← Back</Link>
         <h1 className="mt-3 text-2xl font-semibold">AI usage</h1>
-        <p className="mt-2 text-sm text-neutral-500">Only owners and admins can view organization usage.</p>
+        <p className="mt-2 text-sm text-neutral-500">Only owners and admins can view workspace usage.</p>
       </Shell>
     );
   }
