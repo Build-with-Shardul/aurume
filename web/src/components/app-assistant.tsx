@@ -21,6 +21,12 @@ export default function AppAssistant() {
   }, []);
   const toggle = () => setOpen((o) => { const n = !o; try { localStorage.setItem("aurume.assistant", n ? "1" : "0"); } catch { /* ignore */ } return n; });
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, sending]);
+  // The top-bar "AI Assistant" button toggles this panel.
+  useEffect(() => {
+    const h = () => setOpen((o) => { const n = !o; try { localStorage.setItem("aurume.assistant", n ? "1" : "0"); } catch { /* ignore */ } return n; });
+    window.addEventListener("aurume:toggle-assistant", h);
+    return () => window.removeEventListener("aurume:toggle-assistant", h);
+  }, []);
 
   const projMatch = pathname.match(/^\/projects\/([^/]+)/);
   const projectId = projMatch && projMatch[1] !== "new" ? projMatch[1] : undefined;
@@ -46,7 +52,7 @@ export default function AppAssistant() {
 
   if (!open) {
     return (
-      <div className="sticky top-0 flex h-screen w-12 shrink-0 flex-col items-center justify-end border-l border-neutral-200 bg-white py-4">
+      <div className="flex h-full w-12 shrink-0 flex-col items-center justify-end border-l border-neutral-200 bg-white py-4">
         <button onClick={toggle} title="Ask Aurume" aria-label="Open assistant" className="rounded-lg p-2 text-neutral-900 hover:bg-neutral-100">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" /></svg>
         </button>
@@ -55,7 +61,7 @@ export default function AppAssistant() {
   }
 
   return (
-    <aside className="sticky top-0 flex h-screen w-96 shrink-0 flex-col border-l border-neutral-200 bg-white">
+    <aside className="flex h-full w-96 shrink-0 flex-col border-l border-neutral-200 bg-white">
       <div className="flex items-center justify-between border-b border-neutral-200 px-4 py-3">
         <div className="text-sm font-semibold">
           Ask Aurume{projectId && <span className="ml-1 text-xs font-normal text-neutral-400">· this project</span>}
