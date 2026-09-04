@@ -1,6 +1,6 @@
 import { and, eq, or, desc, asc, inArray } from "drizzle-orm";
 import { db } from "./db";
-import { document, projectDocument, projectMember, documentView, documentReaction, documentComment, documentVersion, documentEvent, user } from "./db/schema";
+import { document, projectDocument, projectMember, documentView, documentReaction, documentComment, documentVersion, documentEvent, project, user } from "./db/schema";
 
 function fmtWhen(d: Date) {
   return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }).format(d);
@@ -73,7 +73,28 @@ export type DocumentMeta = {
   lastEditedByName: string | null;
   totalViews: number;
   viewsByDate: { date: string; count: number }[];
+  sharedWith: string[]; // names of projects this page is mapped into
 };
+
+export type MappableDoc = { id: string; title: string; icon: string | null; visibility: string };
+
+/** Org Wiki docs the user can read that aren't already mapped into this project. */
+export async function listMappableDocuments(orgId: string, userId: string, projectId: string): Promise<MappableDoc[]> {
+  const tree = await listWikiTree(orgId, userId); // workspace + own private, non-archived
+  const mapped = await db.select({ documentId: projectDocument.documentId }).from(projectDocument).where(eq(projectDocument.projectId, projectId));
+  const mappedSet = new Set(mapped.map((m) => m.documentId));
+  return tree.filter((n) => !mappedSet.has(n.id)).map((n) => ({ id: n.id, title: n.title, icon: n.icon, visibility: n.visibility }));
+}
+
+/** Wiki docs currently mapped into a project's knowledge base. */
+export async function listMappedDocuments(projectId: string): Promise<MappableDoc[]> {
+  return db
+    .select({ id: document.id, title: document.title, icon: document.icon, visibility: document.visibility })
+    .from(projectDocument)
+    .innerJoin(document, eq(document.id, projectDocument.documentId))
+    .where(eq(projectDocument.projectId, projectId))
+    .orderBy(asc(document.title));
+}
 
 /** People names + date-wise view counts for a document's metadata bar / stats. */
 export async function getDocumentMeta(doc: { id: string; authorId: string | null; lastEditedBy: string | null }): Promise<DocumentMeta> {
@@ -95,7 +116,13 @@ export async function getDocumentMeta(doc: { id: string; authorId: string | null
   }
   const viewsByDate = [...byDate.entries()].map(([date, count]) => ({ date, count })).sort((a, b) => (a.date < b.date ? 1 : -1));
 
-  return { authorName: nameOf(doc.authorId), lastEditedByName: nameOf(doc.lastEditedBy), totalViews: views.length, viewsByDate };
+  const shared = await db
+    .select({ name: project.name })
+    .from(projectDocument)
+    .innerJoin(project, eq(project.id, projectDocument.projectId))
+    .where(eq(projectDocument.documentId, doc.id));
+
+  return { authorName: nameOf(doc.authorId), lastEditedByName: nameOf(doc.lastEditedBy), totalViews: views.length, viewsByDate, sharedWith: shared.map((s) => s.name) };
 }
 
 export type ReactionSummary = { emoji: string; count: number; mine: boolean };

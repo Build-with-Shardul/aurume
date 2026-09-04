@@ -40,6 +40,7 @@ export default async function DocumentPage({ params }: { params: Promise<{ id: s
       readMinutes={readMinutes}
       totalViews={meta.totalViews}
       viewsByDate={meta.viewsByDate}
+      sharedWith={meta.sharedWith}
       reactions={reactions}
       comments={comments}
       currentUserId={session.user.id}

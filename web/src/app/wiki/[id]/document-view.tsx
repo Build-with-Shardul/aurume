@@ -25,6 +25,7 @@ type Props = {
   readMinutes: number;
   totalViews: number;
   viewsByDate: { date: string; count: number }[];
+  sharedWith: string[];
   reactions: ReactionSummary[];
   comments: CommentItem[];
   currentUserId: string;
@@ -38,7 +39,7 @@ function initials(name: string | null) {
 }
 
 export default function DocumentView(props: Props) {
-  const { id, title, body, visibility, archived, editable, authorName, lastEditedByName, createdLabel, updatedLabel, readMinutes, totalViews, viewsByDate, reactions, comments, currentUserId } = props;
+  const { id, title, body, visibility, archived, editable, authorName, lastEditedByName, createdLabel, updatedLabel, readMinutes, totalViews, viewsByDate, sharedWith, reactions, comments, currentUserId } = props;
   const router = useRouter();
   const [t, setT] = useState(title);
   const [vis, setVis] = useState(visibility);
@@ -136,6 +137,12 @@ export default function DocumentView(props: Props) {
         <span>Updated {updatedLabel}{lastEditedByName ? ` by ${lastEditedByName}` : ""}</span>
         <span>·</span>
         <ViewsStat total={totalViews} byDate={viewsByDate} />
+        {sharedWith.length > 0 && (
+          <>
+            <span>·</span>
+            <span title={sharedWith.join(", ")}>Shared with {sharedWith.length === 1 ? sharedWith[0] : `${sharedWith.length} projects`}</span>
+          </>
+        )}
       </div>
 
       <Reactions docId={id} reactions={reactions} />
