@@ -84,7 +84,7 @@ export function CommentComposer({
   }
 
   return (
-    <div className="overflow-hidden rounded-lg border border-neutral-300 focus-within:border-neutral-900">
+    <div className="rounded-lg border border-neutral-300 focus-within:border-neutral-900">
       {editor && <CommentToolbar editor={editor} />}
       <EditorContent editor={editor} />
       <div className="flex justify-end border-t border-neutral-100 px-2 py-1.5">
@@ -102,7 +102,7 @@ export function CommentComposer({
 
 function CommentToolbar({ editor }: { editor: Editor }) {
   return (
-    <div className="flex flex-wrap items-center gap-0.5 border-b border-neutral-200 bg-neutral-50/80 px-1.5 py-1">
+    <div className="flex flex-wrap items-center gap-0.5 rounded-t-lg border-b border-neutral-200 bg-neutral-50/80 px-1.5 py-1">
       <Btn e={editor} on={() => editor.chain().focus().toggleHeading({ level: 1 }).run()} active={editor.isActive("heading", { level: 1 })} title="Heading 1">H1</Btn>
       <Btn e={editor} on={() => editor.chain().focus().toggleHeading({ level: 2 }).run()} active={editor.isActive("heading", { level: 2 })} title="Heading 2">H2</Btn>
       <Btn e={editor} on={() => editor.chain().focus().toggleHeading({ level: 3 }).run()} active={editor.isActive("heading", { level: 3 })} title="Heading 3">H3</Btn>
@@ -122,11 +122,11 @@ function CommentToolbar({ editor }: { editor: Editor }) {
       <Btn e={editor} on={() => editor.chain().focus().toggleBulletList().run()} active={editor.isActive("bulletList")} title="Bullet list">• List</Btn>
       <Btn e={editor} on={() => editor.chain().focus().toggleOrderedList().run()} active={editor.isActive("orderedList")} title="Numbered list">1. List</Btn>
       <Sep />
-      <LinkPop editor={editor} />
-      <EmojiPop editor={editor} />
-      <TableMenu editor={editor} />
+      <LinkPop editor={editor} align="right" />
+      <EmojiPop editor={editor} align="right" />
+      <TableMenu editor={editor} align="right" />
       <ImageButton editor={editor} />
-      <EmbedPop editor={editor} />
+      <EmbedPop editor={editor} align="right" />
     </div>
   );
 }

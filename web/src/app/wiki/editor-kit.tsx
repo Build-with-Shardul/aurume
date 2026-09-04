@@ -53,7 +53,9 @@ export function Sep() {
 }
 
 // Popover that closes on any outside click (capture-phase pointerdown) or Escape.
-export function Pop({ label, title, children }: { label: React.ReactNode; title: string; children: (close: () => void) => React.ReactNode }) {
+// `align` anchors the panel to the button's left (default) or right edge, so
+// buttons near a container's right edge can open leftward and stay in the box.
+export function Pop({ label, title, align = "left", children }: { label: React.ReactNode; title: string; align?: "left" | "right"; children: (close: () => void) => React.ReactNode }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -70,7 +72,7 @@ export function Pop({ label, title, children }: { label: React.ReactNode; title:
         {label}
       </button>
       {open && (
-        <div className="absolute left-0 z-30 mt-1 rounded-lg border border-neutral-200 bg-white p-2 shadow-lg">{children(() => setOpen(false))}</div>
+        <div className={`absolute z-30 mt-1 rounded-lg border border-neutral-200 bg-white p-2 shadow-lg ${align === "right" ? "right-0" : "left-0"}`}>{children(() => setOpen(false))}</div>
       )}
     </div>
   );
@@ -84,9 +86,9 @@ export function MenuBtn({ onClick, danger, children }: { onClick: () => void; da
   );
 }
 
-export function ColorPop({ editor }: { editor: Editor }) {
+export function ColorPop({ editor, align }: { editor: Editor; align?: "left" | "right" }) {
   return (
-    <Pop label={<span className="font-semibold" style={{ color: editor.getAttributes("textStyle").color || "#111" }}>A</span>} title="Text color">
+    <Pop align={align} label={<span className="font-semibold" style={{ color: editor.getAttributes("textStyle").color || "#111" }}>A</span>} title="Text color">
       {(close) => (
         <div className="flex w-[220px] flex-wrap gap-1">
           {COLORS.map((c) => (
@@ -107,9 +109,9 @@ export function ColorPop({ editor }: { editor: Editor }) {
   );
 }
 
-export function EmojiPop({ editor }: { editor: Editor }) {
+export function EmojiPop({ editor, align }: { editor: Editor; align?: "left" | "right" }) {
   return (
-    <Pop label="🙂" title="Emoji">
+    <Pop align={align} label="🙂" title="Emoji">
       {(close) => (
         <div className="grid w-48 grid-cols-6 gap-0.5">
           {EMOJIS.map((em) => (
@@ -123,10 +125,10 @@ export function EmojiPop({ editor }: { editor: Editor }) {
   );
 }
 
-export function LinkPop({ editor }: { editor: Editor }) {
+export function LinkPop({ editor, align }: { editor: Editor; align?: "left" | "right" }) {
   const [url, setUrl] = useState("");
   return (
-    <Pop label="🔗" title="Link">
+    <Pop align={align} label="🔗" title="Link">
       {(close) => (
         <div className="w-56" onMouseDown={(e) => e.preventDefault()}>
           <input
@@ -182,10 +184,10 @@ export function ImageButton({ editor }: { editor: Editor }) {
   );
 }
 
-export function TableMenu({ editor }: { editor: Editor }) {
+export function TableMenu({ editor, align }: { editor: Editor; align?: "left" | "right" }) {
   const inTable = editor.isActive("table");
   return (
-    <Pop label="▦" title="Table">
+    <Pop align={align} label="▦" title="Table">
       {(close) => (
         <div className="w-40">
           {!inTable ? (
@@ -205,11 +207,11 @@ export function TableMenu({ editor }: { editor: Editor }) {
   );
 }
 
-export function EmbedPop({ editor }: { editor: Editor }) {
+export function EmbedPop({ editor, align }: { editor: Editor; align?: "left" | "right" }) {
   const [url, setUrl] = useState("");
   const [err, setErr] = useState("");
   return (
-    <Pop label="🎬" title="Embed video (YouTube / Loom)">
+    <Pop align={align} label="🎬" title="Embed video (YouTube / Loom)">
       {(close) => (
         <div className="w-60" onMouseDown={(e) => e.preventDefault()}>
           <input
