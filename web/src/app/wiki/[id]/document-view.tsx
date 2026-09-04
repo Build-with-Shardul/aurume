@@ -85,7 +85,8 @@ export default function DocumentView(props: Props) {
     const { json, text } = pending.current;
     setSaveState("saving");
     try {
-      const r = await updateDocumentBody(id, json, text);
+      // Stringify: passing the doc object directly drops custom mark attrs at the action boundary.
+      const r = await updateDocumentBody(id, JSON.stringify(json), text);
       if (r && "error" in r && r.error) throw new Error(r.error);
       pending.current = null;
       try { localStorage.removeItem(key); } catch { /* ignore */ }

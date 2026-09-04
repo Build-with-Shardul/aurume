@@ -75,11 +75,16 @@ export async function renameDocument(id: string, title: string) {
   return { ok: true };
 }
 
-export async function updateDocumentBody(id: string, body: unknown, contentText: string) {
+export async function updateDocumentBody(id: string, bodyJson: string, contentText: string) {
   const c = await ctx();
   if (!c) return { error: "Not signed in" };
   const doc = await editable(c.orgId, c.userId, id);
   if (!doc) return { error: "Not allowed" };
+  // The body is sent as a JSON string on purpose: passing the ProseMirror doc as a
+  // plain object through the server-action boundary drops custom mark attributes
+  // (e.g. the inline-comment anchor id), so we serialize/parse it ourselves.
+  let body: unknown;
+  try { body = JSON.parse(bodyJson); } catch { return { error: "Bad body" }; }
   // Edits go to the WORKING copy. If the page is published, this creates unpublished changes.
   await db.update(document).set({ body: body as never, contentText, hasUnpublishedChanges: doc.status === "published", lastEditedBy: c.userId, updatedAt: new Date() }).where(eq(document.id, id));
   await maybeSnapshot(id, c.userId, doc.title, body, contentText);
