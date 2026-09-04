@@ -150,6 +150,7 @@ function Toolbar({ editor }: { editor: Editor | null }) {
       <Btn e={editor} on={() => editor.chain().focus().toggleHeading({ level: 1 }).run()} active={editor.isActive("heading", { level: 1 })} title="Heading 1">H1</Btn>
       <Btn e={editor} on={() => editor.chain().focus().toggleHeading({ level: 2 }).run()} active={editor.isActive("heading", { level: 2 })} title="Heading 2">H2</Btn>
       <Btn e={editor} on={() => editor.chain().focus().toggleHeading({ level: 3 }).run()} active={editor.isActive("heading", { level: 3 })} title="Heading 3">H3</Btn>
+      <Btn e={editor} on={() => editor.chain().focus().setParagraph().run()} active={editor.isActive("paragraph")} title="Paragraph">P</Btn>
       <Sep />
       <Btn e={editor} on={() => editor.chain().focus().toggleBold().run()} active={editor.isActive("bold")} cls="font-bold" title="Bold">B</Btn>
       <Btn e={editor} on={() => editor.chain().focus().toggleItalic().run()} active={editor.isActive("italic")} cls="italic" title="Italic">I</Btn>
