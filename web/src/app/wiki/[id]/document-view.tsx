@@ -37,10 +37,11 @@ type Props = {
   currentUserId: string;
   mentionableUsers: ShareUser[];
   pageRefs: { id: string; title: string }[];
+  diagrams: { id: string; title: string; preview: string | null }[];
 };
 
 export default function DocumentView(props: Props) {
-  const { id, title, readBody, workingBody, visibility, status, hasUnpublishedChanges, archived, editable, authorName, lastEditedByName, createdLabel, updatedLabel, readMinutes, totalViews, viewsByDate, sharedWith, shares, shareableUsers, reactions, comments, currentUserId, mentionableUsers, pageRefs } = props;
+  const { id, title, readBody, workingBody, visibility, status, hasUnpublishedChanges, archived, editable, authorName, lastEditedByName, createdLabel, updatedLabel, readMinutes, totalViews, viewsByDate, sharedWith, shares, shareableUsers, reactions, comments, currentUserId, mentionableUsers, pageRefs, diagrams } = props;
   const router = useRouter();
   const [t, setT] = useState(title);
   const [vis, setVis] = useState(visibility);
@@ -260,7 +261,7 @@ export default function DocumentView(props: Props) {
 
         <div className="mt-5">
           {ready ? (
-            <WikiEditor key={mode} docId={id} content={mode === "edit" ? editContent : readBody} editable={mode === "edit"} onChange={onBody} inlineThreads={inlineThreads} currentUserId={currentUserId} mentionableUsers={mentionableUsers} pageRefs={pageRefs} />
+            <WikiEditor key={mode} docId={id} content={mode === "edit" ? editContent : readBody} editable={mode === "edit"} onChange={onBody} inlineThreads={inlineThreads} currentUserId={currentUserId} mentionableUsers={mentionableUsers} pageRefs={pageRefs} diagrams={diagrams} />
           ) : (
             <div className="min-h-[320px]" />
           )}

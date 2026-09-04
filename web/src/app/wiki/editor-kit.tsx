@@ -4,7 +4,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { type Editor } from "@tiptap/react";
 import { toEmbedUrl } from "./wiki-embed";
 import { uploadWikiImage } from "./actions";
+import { createDiagram } from "../diagrams/actions";
 import type { RefPage } from "./pageref";
+import type { EmbedDiagram } from "./diagram-embed";
 
 export const EMOJIS = ["😀", "😄", "😉", "😎", "🤔", "👍", "🙏", "🎉", "🔥", "✅", "❌", "⚠️", "💡", "📌", "⭐", "❤️", "🚀", "📝", "🐛", "✨"];
 
@@ -240,6 +242,67 @@ export function PageRefButton({ editor, pages, align }: { editor: Editor; pages:
                     className="block w-full truncate rounded px-2 py-1.5 text-left text-sm text-neutral-700 hover:bg-neutral-50"
                   >
                     ↗ {p.title || "Untitled"}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+    </Pop>
+  );
+}
+
+export function DiagramButton({ editor, diagrams, align }: { editor: Editor; diagrams: EmbedDiagram[]; align?: "left" | "right" }) {
+  const [q, setQ] = useState("");
+  const [busy, setBusy] = useState(false);
+  const list = useMemo(() => {
+    const t = q.trim().toLowerCase();
+    return diagrams.filter((d) => !t || (d.title || "Untitled diagram").toLowerCase().includes(t)).slice(0, 20);
+  }, [q, diagrams]);
+
+  function insert(id: string, title: string) {
+    editor.chain().focus().insertContent({ type: "diagramEmbed", attrs: { diagramId: id, title } }).run();
+  }
+
+  return (
+    <Pop align={align} label="📐" title="Embed a diagram">
+      {(close) => (
+        <div className="w-64" onMouseDown={(e) => e.preventDefault()}>
+          <button
+            disabled={busy}
+            onClick={async () => {
+              if (busy) return;
+              setBusy(true);
+              const r = await createDiagram();
+              setBusy(false);
+              if (r && "id" in r && r.id) { insert(r.id, "Untitled diagram"); close(); }
+            }}
+            className="mb-1.5 block w-full rounded-lg bg-neutral-900 px-2 py-1.5 text-center text-xs font-medium text-white hover:bg-neutral-800 disabled:opacity-50"
+          >
+            + New diagram
+          </button>
+          <input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Search diagrams…"
+            className="mb-1.5 w-full rounded border border-neutral-300 px-2 py-1 text-sm outline-none focus:border-neutral-900"
+          />
+          {list.length === 0 ? (
+            <p className="px-1 py-1.5 text-xs text-neutral-400">No diagrams yet.</p>
+          ) : (
+            <ul className="max-h-56 space-y-0.5 overflow-y-auto">
+              {list.map((d) => (
+                <li key={d.id}>
+                  <button
+                    onClick={() => { insert(d.id, d.title); close(); }}
+                    className="flex w-full items-center gap-2 rounded px-1.5 py-1 text-left text-sm text-neutral-700 hover:bg-neutral-50"
+                  >
+                    <span className="flex h-8 w-10 shrink-0 items-center justify-center overflow-hidden rounded border border-neutral-200 bg-neutral-50 text-xs">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      {d.preview ? <img src={d.preview} alt="" className="max-h-full max-w-full object-contain" /> : "📐"}
+                    </span>
+                    <span className="min-w-0 flex-1 truncate">{d.title || "Untitled diagram"}</span>
                   </button>
                 </li>
               ))}

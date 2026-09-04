@@ -13,8 +13,9 @@ import Image from "@tiptap/extension-image";
 import { WikiEmbed } from "./wiki-embed";
 import { CommentMark } from "./comment-mark";
 import { buildPageRef, type RefPage } from "./pageref";
+import { buildDiagramEmbed, type EmbedDiagram } from "./diagram-embed";
 import { addInlineComment, addComment, deleteComment } from "./actions";
-import { Btn, Sep, ColorPop, EmojiPop, LinkPop, ImageButton, EmbedPop, TableMenu, PageRefButton } from "./editor-kit";
+import { Btn, Sep, ColorPop, EmojiPop, LinkPop, ImageButton, EmbedPop, TableMenu, PageRefButton, DiagramButton } from "./editor-kit";
 import InlineThreadPopover, { type PopPos } from "./[id]/inline-thread-popover";
 import type { CommentItem, ShareUser } from "@/lib/wiki";
 
@@ -31,6 +32,7 @@ export default function WikiEditor({
   currentUserId,
   mentionableUsers,
   pageRefs,
+  diagrams,
 }: {
   docId: string;
   content: unknown;
@@ -40,6 +42,7 @@ export default function WikiEditor({
   currentUserId: string;
   mentionableUsers: ShareUser[];
   pageRefs: RefPage[];
+  diagrams: EmbedDiagram[];
 }) {
   const router = useRouter();
   const [active, setActive] = useState<ActiveThread | null>(null);
@@ -60,6 +63,7 @@ export default function WikiEditor({
       WikiEmbed,
       CommentMark,
       buildPageRef(pageRefs),
+      buildDiagramEmbed(diagrams),
     ],
     content: (content as object) ?? "",
     editable,
@@ -98,8 +102,14 @@ export default function WikiEditor({
     setActive({ mode: "create", from, to, quote: editor.state.doc.textBetween(from, to, " "), pos: computePos(rect) });
   }
 
-  // Click a page reference → navigate to it (plain click in read mode; ⌘/Ctrl-click while editing).
+  // Click a page reference / diagram → navigate (plain click in read mode; ⌘/Ctrl-click while editing).
   function onEditorClick(e: React.MouseEvent) {
+    const dia = (e.target as HTMLElement).closest("[data-diagram-embed]") as HTMLElement | null;
+    if (dia) {
+      const did = dia.getAttribute("data-diagram-embed");
+      if (did && (!editable || e.metaKey || e.ctrlKey)) { e.preventDefault(); router.push(`/diagrams/${did}`); return; }
+      if (did && editable) return;
+    }
     const ref = (e.target as HTMLElement).closest("[data-page-ref]") as HTMLElement | null;
     if (ref) {
       const pid = ref.getAttribute("data-page-ref");
@@ -162,7 +172,7 @@ export default function WikiEditor({
 
   return (
     <div>
-      {editable && <Toolbar editor={editor} pageRefs={pageRefs} />}
+      {editable && <Toolbar editor={editor} pageRefs={pageRefs} diagrams={diagrams} />}
       {editable && editor && (
         <BubbleMenu editor={editor} options={{ placement: "bottom", offset: 8, flip: { padding: 88 } }} shouldShow={({ editor: e, from, to }) => e.isEditable && from !== to}>
           <button onMouseDown={(ev) => ev.preventDefault()} onClick={startComment} className="rounded-lg bg-neutral-900 px-2.5 py-1 text-xs font-medium text-white shadow-lg hover:bg-neutral-800">
@@ -191,7 +201,7 @@ export default function WikiEditor({
   );
 }
 
-function Toolbar({ editor, pageRefs }: { editor: Editor | null; pageRefs: RefPage[] }) {
+function Toolbar({ editor, pageRefs, diagrams }: { editor: Editor | null; pageRefs: RefPage[]; diagrams: EmbedDiagram[] }) {
   const [, force] = useState(0);
   useEffect(() => {
     if (!editor) return;
@@ -233,6 +243,7 @@ function Toolbar({ editor, pageRefs }: { editor: Editor | null; pageRefs: RefPag
       <TableMenu editor={editor} />
       <ImageButton editor={editor} />
       <EmbedPop editor={editor} />
+      <DiagramButton editor={editor} diagrams={diagrams} />
     </div>
   );
 }
