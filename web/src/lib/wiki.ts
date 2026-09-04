@@ -88,6 +88,34 @@ export async function listShares(docId: string): Promise<ShareUser[]> {
   return rows.map((r) => ({ id: r.id, name: r.name || r.email || "Someone" }));
 }
 
+/** Users who can be @mentioned on a page: the members of every project the page is
+ * mapped into (union). If the page is in no project, all workspace members. Excludes self. */
+export async function listMentionableUsers(orgId: string, userId: string, docId: string): Promise<ShareUser[]> {
+  const mapped = await db.select({ projectId: projectDocument.projectId }).from(projectDocument).where(eq(projectDocument.documentId, docId));
+  let rows: { id: string; name: string | null; email: string }[];
+  if (mapped.length) {
+    rows = await db
+      .select({ id: user.id, name: user.name, email: user.email })
+      .from(projectMember)
+      .innerJoin(user, eq(user.id, projectMember.userId))
+      .where(inArray(projectMember.projectId, mapped.map((m) => m.projectId)));
+  } else {
+    rows = await db
+      .select({ id: user.id, name: user.name, email: user.email })
+      .from(member)
+      .innerJoin(user, eq(user.id, member.userId))
+      .where(eq(member.organizationId, orgId));
+  }
+  const seen = new Set<string>();
+  const out: ShareUser[] = [];
+  for (const r of rows) {
+    if (r.id === userId || seen.has(r.id)) continue;
+    seen.add(r.id);
+    out.push({ id: r.id, name: r.name || r.email || "Someone" });
+  }
+  return out;
+}
+
 /** Workspace members who could be added as sharers (excludes the author + already-shared). */
 export async function listShareableUsers(orgId: string, docId: string, authorId: string | null): Promise<ShareUser[]> {
   const members = await db

@@ -9,6 +9,7 @@ import { TextStyle, Color } from "@tiptap/extension-text-style";
 import { Table, TableRow, TableHeader, TableCell } from "@tiptap/extension-table";
 import Image from "@tiptap/extension-image";
 import { WikiEmbed } from "./wiki-embed";
+import { buildMention } from "./mention";
 import { Btn, Sep, ColorPop, EmojiPop, LinkPop, ImageButton, EmbedPop, TableMenu } from "./editor-kit";
 
 // The extension set shared by the comment composer and the read-only renderer:
@@ -27,6 +28,7 @@ function commentExtensions(placeholder?: string) {
     TableCell,
     Image.configure({ HTMLAttributes: { class: "wiki-image" } }),
     WikiEmbed,
+    buildMention(null), // render stored @mention chips (read-only; no suggestion popup)
   ];
 }
 

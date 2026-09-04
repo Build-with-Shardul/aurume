@@ -15,7 +15,7 @@ import { CommentMark } from "./comment-mark";
 import { addInlineComment, addComment, deleteComment } from "./actions";
 import { Btn, Sep, ColorPop, EmojiPop, LinkPop, ImageButton, EmbedPop, TableMenu } from "./editor-kit";
 import InlineThreadPopover, { type PopPos } from "./[id]/inline-thread-popover";
-import type { CommentItem } from "@/lib/wiki";
+import type { CommentItem, ShareUser } from "@/lib/wiki";
 
 export type InlineThread = { id: string; quote: string | null; items: CommentItem[] };
 
@@ -28,6 +28,7 @@ export default function WikiEditor({
   onChange,
   inlineThreads,
   currentUserId,
+  mentionableUsers,
 }: {
   docId: string;
   content: unknown;
@@ -35,6 +36,7 @@ export default function WikiEditor({
   onChange: (json: unknown, text: string) => void;
   inlineThreads: InlineThread[];
   currentUserId: string;
+  mentionableUsers: ShareUser[];
 }) {
   const router = useRouter();
   const [active, setActive] = useState<ActiveThread | null>(null);
@@ -168,6 +170,7 @@ export default function WikiEditor({
           quote={active.quote}
           items={activeItems}
           currentUserId={currentUserId}
+          mentionableUsers={mentionableUsers}
           busy={busy}
           onSubmit={submitActive}
           onDelete={deleteInline}

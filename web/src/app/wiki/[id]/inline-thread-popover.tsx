@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import type { CommentItem } from "@/lib/wiki";
+import type { CommentItem, ShareUser } from "@/lib/wiki";
 import { CommentContent } from "../comment-editor";
+import MentionInput from "./mention-input";
 
 export type PopPos = { left: number; top?: number; bottom?: number; maxHeight: number };
 
@@ -20,6 +21,7 @@ export default function InlineThreadPopover({
   quote,
   items,
   currentUserId,
+  mentionableUsers,
   busy,
   onSubmit,
   onDelete,
@@ -29,16 +31,25 @@ export default function InlineThreadPopover({
   quote: string;
   items: CommentItem[];
   currentUserId: string;
+  mentionableUsers: ShareUser[];
   busy: boolean;
-  onSubmit: (text: string) => void;
+  onSubmit: (html: string) => void;
   onDelete: (id: string) => void;
   onClose: () => void;
 }) {
   const ref = useRef<HTMLDivElement>(null);
-  const [text, setText] = useState("");
+  const [html, setHtml] = useState("");
+  const [empty, setEmpty] = useState(true);
+  const [resetKey, setResetKey] = useState(0);
 
   useEffect(() => {
-    const onDown = (e: PointerEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) onClose(); };
+    const onDown = (e: PointerEvent) => {
+      const t = e.target as Node;
+      if (ref.current && ref.current.contains(t)) return;
+      // Clicks inside the mention suggestion menu (rendered on document.body) must not close.
+      if ((t as HTMLElement).closest?.(".wiki-mention-menu")) return;
+      onClose();
+    };
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
     document.addEventListener("pointerdown", onDown, true);
     document.addEventListener("keydown", onKey);
@@ -48,10 +59,11 @@ export default function InlineThreadPopover({
   const creating = items.length === 0;
 
   function send() {
-    const t = text.trim();
-    if (!t || busy) return;
-    onSubmit(t);
-    setText("");
+    if (empty || busy) return;
+    onSubmit(html);
+    setHtml("");
+    setEmpty(true);
+    setResetKey((k) => k + 1);
   }
 
   return (
@@ -90,17 +102,18 @@ export default function InlineThreadPopover({
       )}
 
       <div className="border-t border-neutral-100 p-2">
-        <textarea
-          autoFocus
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          onKeyDown={(e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); send(); } }}
-          rows={2}
-          placeholder={creating ? "Add a comment…" : "Reply…"}
-          className="w-full resize-none rounded-lg border border-neutral-300 px-2.5 py-1.5 text-sm outline-none focus:border-neutral-900"
-        />
+        <div className="rounded-lg border border-neutral-300 focus-within:border-neutral-900">
+          <MentionInput
+            key={resetKey}
+            users={mentionableUsers}
+            autoFocus
+            placeholder={creating ? "Add a comment…  (@ to mention)" : "Reply…  (@ to mention)"}
+            onChange={(h, e) => { setHtml(h); setEmpty(e); }}
+            onEnter={send}
+          />
+        </div>
         <div className="mt-1.5 flex justify-end">
-          <button onClick={send} disabled={busy || !text.trim()} className="rounded-lg bg-neutral-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-neutral-800 disabled:opacity-40">
+          <button onClick={send} disabled={busy || empty} className="rounded-lg bg-neutral-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-neutral-800 disabled:opacity-40">
             {creating ? "Comment" : "Reply"}
           </button>
         </div>
