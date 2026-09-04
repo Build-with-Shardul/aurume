@@ -125,12 +125,29 @@ export default function WikiEditor({
 const EMOJIS = ["😀", "😄", "😉", "😎", "🤔", "👍", "🙏", "🎉", "🔥", "✅", "❌", "⚠️", "💡", "📌", "⭐", "❤️", "🚀", "📝", "🐛", "✨"];
 const COLORS: { name: string; v: string | null }[] = [
   { name: "Default", v: null },
+  { name: "Black", v: "#111827" },
   { name: "Gray", v: "#6b7280" },
+  { name: "Light gray", v: "#9ca3af" },
+  { name: "Slate", v: "#475569" },
+  { name: "Brown", v: "#92400e" },
+  { name: "Maroon", v: "#7f1d1d" },
   { name: "Red", v: "#dc2626" },
-  { name: "Orange", v: "#ea580c" },
-  { name: "Green", v: "#16a34a" },
+  { name: "Rose", v: "#e11d48" },
+  { name: "Pink", v: "#db2777" },
+  { name: "Fuchsia", v: "#c026d3" },
+  { name: "Purple", v: "#9333ea" },
+  { name: "Violet", v: "#7c3aed" },
+  { name: "Indigo", v: "#4f46e5" },
   { name: "Blue", v: "#2563eb" },
-  { name: "Purple", v: "#7c3aed" },
+  { name: "Sky", v: "#0284c7" },
+  { name: "Cyan", v: "#0891b2" },
+  { name: "Teal", v: "#0d9488" },
+  { name: "Emerald", v: "#059669" },
+  { name: "Green", v: "#16a34a" },
+  { name: "Lime", v: "#65a30d" },
+  { name: "Yellow", v: "#ca8a04" },
+  { name: "Amber", v: "#d97706" },
+  { name: "Orange", v: "#ea580c" },
 ];
 
 function Toolbar({ editor }: { editor: Editor | null }) {
@@ -256,16 +273,23 @@ function Sep() {
 // --- popover wrapper ---
 function Pop({ label, title, children }: { label: React.ReactNode; title: string; children: (close: () => void) => React.ReactNode }) {
   const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    // Close on a click/tap anywhere outside the popover, or on Escape.
+    const onDown = (e: PointerEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
+    document.addEventListener("pointerdown", onDown, true);
+    document.addEventListener("keydown", onKey);
+    return () => { document.removeEventListener("pointerdown", onDown, true); document.removeEventListener("keydown", onKey); };
+  }, [open]);
   return (
-    <div className="relative">
+    <div className="relative" ref={ref}>
       <button onMouseDown={(e) => e.preventDefault()} onClick={() => setOpen((o) => !o)} title={title} className="rounded px-2 py-1 text-sm leading-none text-neutral-600 hover:bg-neutral-100">
         {label}
       </button>
       {open && (
-        <>
-          <div className="fixed inset-0 z-20" onClick={() => setOpen(false)} />
-          <div className="absolute left-0 z-30 mt-1 rounded-lg border border-neutral-200 bg-white p-2 shadow-lg">{children(() => setOpen(false))}</div>
-        </>
+        <div className="absolute left-0 z-30 mt-1 rounded-lg border border-neutral-200 bg-white p-2 shadow-lg">{children(() => setOpen(false))}</div>
       )}
     </div>
   );
@@ -275,14 +299,14 @@ function ColorPop({ editor }: { editor: Editor }) {
   return (
     <Pop label={<span className="font-semibold" style={{ color: editor.getAttributes("textStyle").color || "#111" }}>A</span>} title="Text color">
       {(close) => (
-        <div className="flex w-40 flex-wrap gap-1">
+        <div className="grid grid-cols-8 gap-1">
           {COLORS.map((c) => (
             <button
               key={c.name}
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => { if (c.v) editor.chain().focus().setColor(c.v).run(); else editor.chain().focus().unsetColor().run(); close(); }}
               title={c.name}
-              className="flex h-6 w-6 items-center justify-center rounded border border-neutral-200 text-xs"
+              className="flex h-6 w-6 items-center justify-center rounded border border-neutral-200 text-xs font-semibold hover:ring-2 hover:ring-neutral-300"
               style={{ color: c.v || "#111" }}
             >
               A
