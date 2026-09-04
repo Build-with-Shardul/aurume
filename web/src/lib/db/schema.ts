@@ -26,6 +26,9 @@ export const user = pgTable("user", {
   banned: boolean("banned").default(false),
   banReason: text("ban_reason"),
   banExpires: timestamp("ban_expires"),
+  // Onboarding: captured on first sign-up (see /onboarding). Descriptive only.
+  onboardingRole: text("onboarding_role"), // e.g. product_manager, developer
+  onboardingIntent: text("onboarding_intent"), // e.g. roadmap, sprints, exploring
 });
 
 export const session = pgTable(
@@ -99,6 +102,7 @@ export const organization = pgTable(
     logo: text("logo"),
     createdAt: timestamp("created_at").notNull(),
     metadata: text("metadata"),
+    teamSize: text("team_size"), // onboarding bucket: 1 | 2-10 | 11-50 | 51-200 | 200+
   },
   (table) => [uniqueIndex("organization_slug_uidx").on(table.slug)],
 );
@@ -318,6 +322,163 @@ export const knowledgeItem = pgTable(
   (t) => [
     index("knowledge_item_project_idx").on(t.projectId),
     index("knowledge_item_org_idx").on(t.organizationId),
+  ],
+);
+
+// A Wiki page — AUTHORED (block editor), hierarchical (parentId tree), versioned.
+// Distinct from knowledge_item (uploads). Feeds AI grounding via `contentText`,
+// but always access-scoped (see below).
+//
+// Access model (hard rule): a user may read a document iff
+//   visibility = "workspace"  OR  author = user  OR
+//   the doc is mapped (project_document) to a project the user is a member of.
+// AI grounding for a given asker is filtered to exactly this readable set.
+export const document = pgTable(
+  "document",
+  {
+    id: text("id").primaryKey(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    parentId: text("parent_id"), // self-ref (app-enforced; nullable = top-level page)
+    title: text("title").notNull().default("Untitled"),
+    icon: text("icon"), // emoji
+    body: jsonb("body"), // TipTap block JSON — the WORKING copy (what editors edit)
+    contentText: text("content_text"), // extracted plain text of the working copy, for retrieval
+    publishedBody: jsonb("published_body"), // the PUBLISHED copy (what readers see); null until first publish
+    publishedContentText: text("published_content_text"),
+    hasUnpublishedChanges: boolean("has_unpublished_changes").notNull().default(false),
+    visibility: text("visibility").notNull().default("workspace"), // workspace | private
+    status: text("status").notNull().default("draft"), // draft (author-only) | published
+    archived: boolean("archived").notNull().default(false),
+    orderIndex: integer("order_index").notNull().default(0),
+    authorId: text("author_id").references(() => user.id, { onDelete: "set null" }),
+    createdBy: text("created_by").references(() => user.id, { onDelete: "set null" }),
+    lastEditedBy: text("last_edited_by").references(() => user.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (t) => [index("document_org_idx").on(t.organizationId), index("document_parent_idx").on(t.parentId)],
+);
+
+// An uploaded asset (image) embedded in a Wiki page. Bytes live in the storage
+// backend at storageKey; served via /api/wiki/assets/[id] to authenticated org members.
+export const documentAsset = pgTable(
+  "document_asset",
+  {
+    id: text("id").primaryKey(),
+    organizationId: text("organization_id").notNull().references(() => organization.id, { onDelete: "cascade" }),
+    storageKey: text("storage_key").notNull(),
+    mimeType: text("mime_type"),
+    sizeBytes: integer("size_bytes"),
+    createdBy: text("created_by").references(() => user.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => [index("document_asset_org_idx").on(t.organizationId)],
+);
+
+// A page view, logged per open — powers date-wise view stats (kept simple for now).
+export const documentView = pgTable(
+  "document_view",
+  {
+    id: text("id").primaryKey(),
+    documentId: text("document_id").notNull().references(() => document.id, { onDelete: "cascade" }),
+    userId: text("user_id").references(() => user.id, { onDelete: "set null" }),
+    viewedAt: timestamp("viewed_at").defaultNow().notNull(),
+  },
+  (t) => [index("document_view_doc_idx").on(t.documentId)],
+);
+
+// An emoji reaction on a page (one per user+emoji, toggled).
+export const documentReaction = pgTable(
+  "document_reaction",
+  {
+    id: text("id").primaryKey(),
+    documentId: text("document_id").notNull().references(() => document.id, { onDelete: "cascade" }),
+    userId: text("user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+    emoji: text("emoji").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => [uniqueIndex("document_reaction_uidx").on(t.documentId, t.userId, t.emoji), index("document_reaction_doc_idx").on(t.documentId)],
+);
+
+// A page comment; nested via parentId (app-enforced). Readable/writable only by
+// users who can read the page (checked in the actions).
+export const documentComment = pgTable(
+  "document_comment",
+  {
+    id: text("id").primaryKey(),
+    documentId: text("document_id").notNull().references(() => document.id, { onDelete: "cascade" }),
+    parentId: text("parent_id"),
+    authorId: text("author_id").references(() => user.id, { onDelete: "set null" }),
+    body: text("body").notNull(),
+    quote: text("quote"), // for inline (anchored) threads: the selected text snippet; null = page-level
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (t) => [index("document_comment_doc_idx").on(t.documentId)],
+);
+
+// Explicit per-user share of a page — grants that user read access (even to a
+// draft, since it's a deliberate person-to-person grant).
+export const documentShare = pgTable(
+  "document_share",
+  {
+    id: text("id").primaryKey(),
+    documentId: text("document_id").notNull().references(() => document.id, { onDelete: "cascade" }),
+    userId: text("user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+    addedBy: text("added_by").references(() => user.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => [uniqueIndex("document_share_uidx").on(t.documentId, t.userId), index("document_share_doc_idx").on(t.documentId), index("document_share_user_idx").on(t.userId)],
+);
+
+// Version history for a document (snapshot on save; restore).
+export const documentVersion = pgTable(
+  "document_version",
+  {
+    id: text("id").primaryKey(),
+    documentId: text("document_id").notNull().references(() => document.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    body: jsonb("body"),
+    contentText: text("content_text"),
+    editedBy: text("edited_by").references(() => user.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => [index("document_version_doc_idx").on(t.documentId)],
+);
+
+// Discrete change-log events for a page (created, renamed, visibility, archived,
+// restored). Content edits are captured as document_version snapshots instead.
+export const documentEvent = pgTable(
+  "document_event",
+  {
+    id: text("id").primaryKey(),
+    documentId: text("document_id").notNull().references(() => document.id, { onDelete: "cascade" }),
+    type: text("type").notNull(), // created | renamed | visibility_workspace | visibility_private | archived | unarchived | restored
+    detail: text("detail"),
+    actorId: text("actor_id").references(() => user.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => [index("document_event_doc_idx").on(t.documentId)],
+);
+
+// Maps an org Wiki document into a project's knowledge base. Also acts as a
+// READ-ACCESS GRANT: a private doc mapped here becomes readable by that
+// project's members (D-A). Reference, not copy — the doc stays owned by the Wiki.
+export const projectDocument = pgTable(
+  "project_document",
+  {
+    id: text("id").primaryKey(),
+    projectId: text("project_id").notNull().references(() => project.id, { onDelete: "cascade" }),
+    documentId: text("document_id").notNull().references(() => document.id, { onDelete: "cascade" }),
+    addedBy: text("added_by").references(() => user.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => [
+    uniqueIndex("project_document_uidx").on(t.projectId, t.documentId),
+    index("project_document_project_idx").on(t.projectId),
+    index("project_document_doc_idx").on(t.documentId),
   ],
 );
 
@@ -696,4 +857,104 @@ export const aiGeneration = pgTable(
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (t) => [index("ai_generation_org_idx").on(t.organizationId)],
+);
+
+// draw.io diagrams. The XML is the source of truth; `preview` is an exported SVG used
+// for inline rendering in the Diagrams list and when embedded in a wiki page.
+export const diagram = pgTable(
+  "diagram",
+  {
+    id: text("id").primaryKey(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    parentId: text("parent_id"), // self-ref (app-enforced; nullable = top-level)
+    title: text("title").notNull().default("Untitled diagram"),
+    xml: text("xml"),
+    preview: text("preview"),
+    visibility: text("visibility").notNull().default("workspace"), // workspace | private
+    archived: boolean("archived").notNull().default(false),
+    orderIndex: integer("order_index").notNull().default(0),
+    authorId: text("author_id").references(() => user.id, { onDelete: "set null" }),
+    createdBy: text("created_by").references(() => user.id, { onDelete: "set null" }),
+    lastEditedBy: text("last_edited_by").references(() => user.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (t) => [index("diagram_org_idx").on(t.organizationId), index("diagram_parent_idx").on(t.parentId)],
+);
+
+// Explicit per-user shares of a diagram (grants read access even to a private one).
+export const diagramShare = pgTable(
+  "diagram_share",
+  {
+    id: text("id").primaryKey(),
+    diagramId: text("diagram_id")
+      .notNull()
+      .references(() => diagram.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    addedBy: text("added_by").references(() => user.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => [
+    uniqueIndex("diagram_share_uidx").on(t.diagramId, t.userId),
+    index("diagram_share_doc_idx").on(t.diagramId),
+    index("diagram_share_user_idx").on(t.userId),
+  ],
+);
+
+// Maps a diagram into a project's knowledge base (mirrors project_document).
+export const projectDiagram = pgTable(
+  "project_diagram",
+  {
+    id: text("id").primaryKey(),
+    projectId: text("project_id").notNull().references(() => project.id, { onDelete: "cascade" }),
+    diagramId: text("diagram_id").notNull().references(() => diagram.id, { onDelete: "cascade" }),
+    addedBy: text("added_by").references(() => user.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => [
+    uniqueIndex("project_diagram_uidx").on(t.projectId, t.diagramId),
+    index("project_diagram_project_idx").on(t.projectId),
+    index("project_diagram_diagram_idx").on(t.diagramId),
+  ],
+);
+
+export const diagramComment = pgTable(
+  "diagram_comment",
+  {
+    id: text("id").primaryKey(),
+    diagramId: text("diagram_id").notNull().references(() => diagram.id, { onDelete: "cascade" }),
+    parentId: text("parent_id"),
+    authorId: text("author_id").references(() => user.id, { onDelete: "set null" }),
+    body: text("body").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (t) => [index("diagram_comment_diagram_idx").on(t.diagramId)],
+);
+
+export const diagramReaction = pgTable(
+  "diagram_reaction",
+  {
+    id: text("id").primaryKey(),
+    diagramId: text("diagram_id").notNull().references(() => diagram.id, { onDelete: "cascade" }),
+    userId: text("user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+    emoji: text("emoji").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => [uniqueIndex("diagram_reaction_uidx").on(t.diagramId, t.userId, t.emoji), index("diagram_reaction_diagram_idx").on(t.diagramId)],
+);
+
+export const diagramView = pgTable(
+  "diagram_view",
+  {
+    id: text("id").primaryKey(),
+    diagramId: text("diagram_id").notNull().references(() => diagram.id, { onDelete: "cascade" }),
+    userId: text("user_id").references(() => user.id, { onDelete: "set null" }),
+    viewedAt: timestamp("viewed_at").defaultNow().notNull(),
+  },
+  (t) => [index("diagram_view_diagram_idx").on(t.diagramId)],
 );

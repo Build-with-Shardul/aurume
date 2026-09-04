@@ -75,7 +75,7 @@ export default async function SuperadminPage() {
         Every organization and every user across this Aurume instance.
       </p>
       <div className="mt-4 flex gap-6 text-sm text-neutral-500">
-        <span><strong className="text-neutral-900">{orgs.length}</strong> organizations</span>
+        <span><strong className="text-neutral-900">{orgs.length}</strong> workspaces</span>
         <span><strong className="text-neutral-900">{users.length}</strong> users</span>
         <span><strong className="text-neutral-900">{users.filter((u) => u.role === "admin").length}</strong> super admins</span>
       </div>

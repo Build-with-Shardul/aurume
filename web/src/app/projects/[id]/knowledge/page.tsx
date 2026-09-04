@@ -5,7 +5,9 @@ import { getActiveMembership } from "@/lib/auth-server";
 import { db } from "@/lib/db";
 import { project, knowledgeItem, user } from "@/lib/db/schema";
 import { canDeleteItem } from "@/lib/knowledge";
+import { listMappedDocuments, listMappableDocuments } from "@/lib/wiki";
 import KnowledgeClient, { type KnowledgeItemView } from "./knowledge-client";
+import WikiMappings from "./wiki-mappings";
 import { addKnowledgeNote, deleteKnowledgeItem } from "./actions";
 
 export default async function KnowledgePage({ params }: { params: Promise<{ id: string }> }) {
@@ -39,6 +41,11 @@ export default async function KnowledgePage({ params }: { params: Promise<{ id: 
     canDelete: canDeleteItem(r, p, m),
   }));
 
+  const [mappedDocs, mappableDocs] = await Promise.all([
+    listMappedDocuments(id),
+    listMappableDocuments(m.orgId!, m.userId, id),
+  ]);
+
   return (
     <main className="min-h-screen bg-neutral-50 text-neutral-900">
       <div className="w-full px-6 py-10">
@@ -46,11 +53,12 @@ export default async function KnowledgePage({ params }: { params: Promise<{ id: 
         <h1 className="mt-3 text-2xl font-semibold">Knowledge space</h1>
         <p className="mt-1 text-sm text-neutral-500">
           This project&apos;s knowledge. Aurume also draws on your{" "}
-          <Link href="/knowledge" className="font-medium text-neutral-900 underline">organization knowledge</Link>{" "}
+          <Link href="/knowledge" className="font-medium text-neutral-900 underline">workspace knowledge</Link>{" "}
           (every project&apos;s knowledge, rolled up) when drafting playbooks and other artifacts.
         </p>
 
         <div className="mt-8">
+          <WikiMappings projectId={id} mapped={mappedDocs} mappable={mappableDocs} />
           <KnowledgeClient
             items={items}
             uploadUrl={`/api/projects/${id}/knowledge`}
