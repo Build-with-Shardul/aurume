@@ -218,6 +218,43 @@ export async function deleteComment(commentId: string) {
   return { ok: true };
 }
 
+/** Move a page/folder under a new parent (or to a section root). Visibility follows
+ * the destination and cascades to the whole moved subtree. Cycle-safe. */
+export async function moveDocument(docId: string, newParentId: string | null, sectionVisibility?: "workspace" | "private") {
+  const c = await ctx();
+  if (!c) return { error: "Not signed in" };
+  const doc = await editable(c.orgId, c.userId, docId);
+  if (!doc) return { error: "Not allowed" };
+
+  const all = await db.select({ id: document.id, parentId: document.parentId }).from(document).where(eq(document.organizationId, c.orgId));
+  const subtree = new Set<string>([docId]); // docId + all descendants
+  for (let changed = true; changed; ) {
+    changed = false;
+    for (const r of all) {
+      if (r.parentId && subtree.has(r.parentId) && !subtree.has(r.id)) { subtree.add(r.id); changed = true; }
+    }
+  }
+
+  let destVis: "workspace" | "private";
+  if (newParentId) {
+    if (subtree.has(newParentId)) return { error: "Can't move a page into itself or its own subpage." };
+    const parent = await getReadableDocument(c.orgId, c.userId, newParentId);
+    if (!parent) return { error: "Destination not found" };
+    destVis = parent.visibility === "private" ? "private" : "workspace";
+  } else {
+    destVis = sectionVisibility === "private" ? "private" : "workspace";
+  }
+
+  await db.update(document).set({ parentId: newParentId ?? null, lastEditedBy: c.userId, updatedAt: new Date() }).where(eq(document.id, docId));
+  if (doc.visibility !== destVis) {
+    await db.update(document).set({ visibility: destVis, lastEditedBy: c.userId, updatedAt: new Date() }).where(inArray(document.id, [...subtree]));
+    await logEvent(docId, destVis === "private" ? "visibility_private" : "visibility_workspace", null, c.userId);
+  }
+  revalidatePath("/wiki");
+  revalidatePath(`/wiki/${docId}`);
+  return { ok: true };
+}
+
 /** Permanently delete a page AND all its descendants (parentId has no FK cascade). */
 export async function deleteDocument(id: string) {
   const c = await ctx();
