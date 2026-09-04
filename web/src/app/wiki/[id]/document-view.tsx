@@ -6,6 +6,7 @@ import WikiEditor from "../wiki-editor";
 import ConfirmDialog from "../confirm-dialog";
 import Reactions from "./reactions";
 import Comments from "./comments";
+import History from "./history";
 import { renameDocument, updateDocumentBody, setDocumentVisibility, archiveDocument, deleteDocument, recordView } from "../actions";
 import type { ReactionSummary, CommentItem } from "@/lib/wiki";
 
@@ -96,15 +97,18 @@ export default function DocumentView(props: Props) {
     <div className="mx-auto max-w-3xl px-8 py-10">
       <div className="mb-6 flex h-6 items-center justify-between">
         <span className="text-xs text-neutral-400">{status === "saving" ? "Saving…" : status === "saved" ? "Saved" : ""}</span>
-        {editable && (
-          <div className="flex items-center gap-2">
-            <button onClick={toggleVis} title="Toggle visibility" className="rounded-lg border border-neutral-200 px-2.5 py-1 text-xs font-medium text-neutral-600 hover:bg-neutral-50">
-              {vis === "workspace" ? "🌐 Workspace" : "🔒 Private"}
-            </button>
-            <button onClick={doArchive} className="rounded-lg border border-neutral-200 px-2.5 py-1 text-xs font-medium text-neutral-600 hover:bg-neutral-50">Archive</button>
-            <button onClick={() => setConfirmDel(true)} className="rounded-lg border border-red-200 px-2.5 py-1 text-xs font-medium text-red-600 hover:bg-red-50">Delete</button>
-          </div>
-        )}
+        <div className="flex items-center gap-2">
+          <History docId={id} editable={editable} />
+          {editable && (
+            <>
+              <button onClick={toggleVis} title="Toggle visibility" className="rounded-lg border border-neutral-200 px-2.5 py-1 text-xs font-medium text-neutral-600 hover:bg-neutral-50">
+                {vis === "workspace" ? "🌐 Workspace" : "🔒 Private"}
+              </button>
+              <button onClick={doArchive} className="rounded-lg border border-neutral-200 px-2.5 py-1 text-xs font-medium text-neutral-600 hover:bg-neutral-50">Archive</button>
+              <button onClick={() => setConfirmDel(true)} className="rounded-lg border border-red-200 px-2.5 py-1 text-xs font-medium text-red-600 hover:bg-red-50">Delete</button>
+            </>
+          )}
+        </div>
       </div>
 
       <input

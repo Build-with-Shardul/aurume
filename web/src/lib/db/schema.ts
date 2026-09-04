@@ -422,10 +422,26 @@ export const documentVersion = pgTable(
     documentId: text("document_id").notNull().references(() => document.id, { onDelete: "cascade" }),
     title: text("title").notNull(),
     body: jsonb("body"),
+    contentText: text("content_text"),
     editedBy: text("edited_by").references(() => user.id, { onDelete: "set null" }),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (t) => [index("document_version_doc_idx").on(t.documentId)],
+);
+
+// Discrete change-log events for a page (created, renamed, visibility, archived,
+// restored). Content edits are captured as document_version snapshots instead.
+export const documentEvent = pgTable(
+  "document_event",
+  {
+    id: text("id").primaryKey(),
+    documentId: text("document_id").notNull().references(() => document.id, { onDelete: "cascade" }),
+    type: text("type").notNull(), // created | renamed | visibility_workspace | visibility_private | archived | unarchived | restored
+    detail: text("detail"),
+    actorId: text("actor_id").references(() => user.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => [index("document_event_doc_idx").on(t.documentId)],
 );
 
 // Maps an org Wiki document into a project's knowledge base. Also acts as a

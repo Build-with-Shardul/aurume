@@ -1,11 +1,11 @@
 "use server";
 
-import { and, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
-import { document, documentView, documentAsset, documentReaction, documentComment } from "@/lib/db/schema";
+import { document, documentView, documentAsset, documentReaction, documentComment, documentVersion, documentEvent } from "@/lib/db/schema";
 import { getSession, getActiveMembership } from "@/lib/auth-server";
-import { getReadableDocument, canEditDocument } from "@/lib/wiki";
+import { getReadableDocument, canEditDocument, listHistory } from "@/lib/wiki";
 import { buildKey, saveFile } from "@/lib/storage";
 
 async function ctx() {
@@ -19,6 +19,17 @@ async function editable(orgId: string, userId: string, id: string) {
   const doc = await getReadableDocument(orgId, userId, id);
   if (!doc || !canEditDocument(doc, userId)) return null;
   return doc;
+}
+
+async function logEvent(docId: string, type: string, detail: string | null, actorId: string) {
+  await db.insert(documentEvent).values({ id: crypto.randomUUID(), documentId: docId, type, detail, actorId });
+}
+
+// Coalesce rapid autosaves: snapshot a version only when the newest is >3 min old (or none).
+async function maybeSnapshot(docId: string, actorId: string, title: string, body: unknown, contentText: string) {
+  const last = await db.select({ createdAt: documentVersion.createdAt }).from(documentVersion).where(eq(documentVersion.documentId, docId)).orderBy(desc(documentVersion.createdAt)).limit(1);
+  const stale = !last[0] || Date.now() - last[0].createdAt.getTime() > 3 * 60 * 1000;
+  if (stale) await db.insert(documentVersion).values({ id: crypto.randomUUID(), documentId: docId, title, body: body as never, contentText, editedBy: actorId });
 }
 
 export async function createDocument(input: { parentId?: string | null; title?: string; visibility?: "workspace" | "private" } = {}) {
@@ -41,6 +52,7 @@ export async function createDocument(input: { parentId?: string | null; title?: 
     authorId: c.userId,
     createdBy: c.userId,
   });
+  await logEvent(id, "created", null, c.userId);
   revalidatePath("/wiki");
   return { id };
 }
@@ -50,6 +62,7 @@ export async function renameDocument(id: string, title: string) {
   if (!c) return { error: "Not signed in" };
   if (!(await editable(c.orgId, c.userId, id))) return { error: "Not allowed" };
   await db.update(document).set({ title: title.trim() || "Untitled", lastEditedBy: c.userId, updatedAt: new Date() }).where(eq(document.id, id));
+  await logEvent(id, "renamed", title.trim() || "Untitled", c.userId);
   revalidatePath("/wiki");
   revalidatePath(`/wiki/${id}`);
   return { ok: true };
@@ -58,8 +71,10 @@ export async function renameDocument(id: string, title: string) {
 export async function updateDocumentBody(id: string, body: unknown, contentText: string) {
   const c = await ctx();
   if (!c) return { error: "Not signed in" };
-  if (!(await editable(c.orgId, c.userId, id))) return { error: "Not allowed" };
+  const doc = await editable(c.orgId, c.userId, id);
+  if (!doc) return { error: "Not allowed" };
   await db.update(document).set({ body: body as never, contentText, lastEditedBy: c.userId, updatedAt: new Date() }).where(eq(document.id, id));
+  await maybeSnapshot(id, c.userId, doc.title, body, contentText);
   return { ok: true };
 }
 
@@ -68,6 +83,7 @@ export async function setDocumentVisibility(id: string, visibility: "workspace" 
   if (!c) return { error: "Not signed in" };
   if (!(await editable(c.orgId, c.userId, id))) return { error: "Not allowed" };
   await db.update(document).set({ visibility, lastEditedBy: c.userId, updatedAt: new Date() }).where(eq(document.id, id));
+  await logEvent(id, visibility === "private" ? "visibility_private" : "visibility_workspace", null, c.userId);
   revalidatePath("/wiki");
   revalidatePath(`/wiki/${id}`);
   return { ok: true };
@@ -78,8 +94,36 @@ export async function archiveDocument(id: string, archived: boolean) {
   if (!c) return { error: "Not signed in" };
   if (!(await editable(c.orgId, c.userId, id))) return { error: "Not allowed" };
   await db.update(document).set({ archived, lastEditedBy: c.userId, updatedAt: new Date() }).where(eq(document.id, id));
+  await logEvent(id, archived ? "archived" : "unarchived", null, c.userId);
   revalidatePath("/wiki");
   return { ok: true };
+}
+
+/** Restore a page to an earlier version (snapshots the current state first). */
+export async function restoreVersion(versionId: string) {
+  const c = await ctx();
+  if (!c) return { error: "Not signed in" };
+  const vrows = await db.select().from(documentVersion).where(eq(documentVersion.id, versionId)).limit(1);
+  const v = vrows[0];
+  if (!v) return { error: "Not found" };
+  const doc = await editable(c.orgId, c.userId, v.documentId);
+  if (!doc) return { error: "Not allowed" };
+  // Keep the current state as a version so restore is itself reversible.
+  await db.insert(documentVersion).values({ id: crypto.randomUUID(), documentId: v.documentId, title: doc.title, body: doc.body as never, contentText: doc.contentText, editedBy: c.userId });
+  await db.update(document).set({ title: v.title, body: v.body as never, contentText: v.contentText, lastEditedBy: c.userId, updatedAt: new Date() }).where(eq(document.id, v.documentId));
+  await logEvent(v.documentId, "restored", null, c.userId);
+  revalidatePath("/wiki");
+  revalidatePath(`/wiki/${v.documentId}`);
+  return { ok: true };
+}
+
+/** Fetch the merged change log for a page (readers only). */
+export async function getHistory(docId: string) {
+  const c = await ctx();
+  if (!c) return { error: "Not signed in" as const };
+  const doc = await getReadableDocument(c.orgId, c.userId, docId);
+  if (!doc) return { error: "Not found" as const };
+  return { items: await listHistory(docId) };
 }
 
 /** Upload an image for embedding in a page. Returns a URL served by /api/wiki/assets/[id]. */

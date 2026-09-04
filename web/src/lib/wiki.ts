@@ -1,6 +1,6 @@
 import { and, eq, or, desc, asc, inArray } from "drizzle-orm";
 import { db } from "./db";
-import { document, projectDocument, projectMember, documentView, documentReaction, documentComment, user } from "./db/schema";
+import { document, projectDocument, projectMember, documentView, documentReaction, documentComment, documentVersion, documentEvent, user } from "./db/schema";
 
 function fmtWhen(d: Date) {
   return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }).format(d);
@@ -139,4 +139,44 @@ export async function listComments(docId: string): Promise<CommentItem[]> {
     body: r.body,
     createdLabel: fmtWhen(r.createdAt),
   }));
+}
+
+export type HistoryItem = { id: string; kind: "version" | "event"; type: string; label: string; actorName: string; whenLabel: string; versionId?: string };
+
+function eventLabel(type: string, detail: string | null) {
+  switch (type) {
+    case "created": return "created this page";
+    case "renamed": return `renamed to "${detail ?? "Untitled"}"`;
+    case "visibility_private": return "changed visibility to Private";
+    case "visibility_workspace": return "changed visibility to Workspace";
+    case "archived": return "archived this page";
+    case "unarchived": return "restored from archive";
+    case "restored": return "restored an earlier version";
+    default: return type;
+  }
+}
+
+/** Merged change log: content-edit version snapshots (restorable) + discrete events, newest first. */
+export async function listHistory(docId: string): Promise<HistoryItem[]> {
+  const [versions, events] = await Promise.all([
+    db
+      .select({ id: documentVersion.id, createdAt: documentVersion.createdAt, name: user.name, email: user.email })
+      .from(documentVersion)
+      .leftJoin(user, eq(user.id, documentVersion.editedBy))
+      .where(eq(documentVersion.documentId, docId)),
+    db
+      .select({ id: documentEvent.id, type: documentEvent.type, detail: documentEvent.detail, createdAt: documentEvent.createdAt, name: user.name, email: user.email })
+      .from(documentEvent)
+      .leftJoin(user, eq(user.id, documentEvent.actorId))
+      .where(eq(documentEvent.documentId, docId)),
+  ]);
+  const items: (HistoryItem & { ts: number })[] = [];
+  for (const v of versions) {
+    items.push({ id: v.id, kind: "version", type: "edited", label: "made edits", actorName: v.name || v.email || "Someone", whenLabel: fmtWhen(v.createdAt), versionId: v.id, ts: v.createdAt.getTime() });
+  }
+  for (const e of events) {
+    items.push({ id: e.id, kind: "event", type: e.type, label: eventLabel(e.type, e.detail), actorName: e.name || e.email || "Someone", whenLabel: fmtWhen(e.createdAt), ts: e.createdAt.getTime() });
+  }
+  items.sort((a, b) => b.ts - a.ts);
+  return items.map(({ ts, ...rest }) => { void ts; return rest; });
 }
