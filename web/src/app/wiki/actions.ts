@@ -3,7 +3,7 @@
 import { and, desc, eq, inArray } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
-import { document, documentView, documentAsset, documentReaction, documentComment, documentVersion, documentEvent } from "@/lib/db/schema";
+import { document, documentView, documentAsset, documentReaction, documentComment, documentVersion, documentEvent, documentShare, member } from "@/lib/db/schema";
 import { getSession, getActiveMembership } from "@/lib/auth-server";
 import { getReadableDocument, canEditDocument, listHistory } from "@/lib/wiki";
 import { buildKey, saveFile } from "@/lib/storage";
@@ -167,6 +167,28 @@ export async function recordView(id: string) {
   const doc = await getReadableDocument(c.orgId, c.userId, id);
   if (!doc) return { error: "Not found" };
   await db.insert(documentView).values({ id: crypto.randomUUID(), documentId: id, userId: c.userId });
+  return { ok: true };
+}
+
+/** Share a page with a specific workspace member (grants them read access). */
+export async function shareWithUser(docId: string, targetUserId: string) {
+  const c = await ctx();
+  if (!c) return { error: "Not signed in" };
+  if (!(await editable(c.orgId, c.userId, docId))) return { error: "Not allowed" };
+  const m = await db.select({ id: member.id }).from(member).where(and(eq(member.organizationId, c.orgId), eq(member.userId, targetUserId))).limit(1);
+  if (!m.length) return { error: "Not a workspace member" };
+  const existing = await db.select({ id: documentShare.id }).from(documentShare).where(and(eq(documentShare.documentId, docId), eq(documentShare.userId, targetUserId))).limit(1);
+  if (!existing.length) await db.insert(documentShare).values({ id: crypto.randomUUID(), documentId: docId, userId: targetUserId, addedBy: c.userId });
+  revalidatePath(`/wiki/${docId}`);
+  return { ok: true };
+}
+
+export async function unshareUser(docId: string, targetUserId: string) {
+  const c = await ctx();
+  if (!c) return { error: "Not signed in" };
+  if (!(await editable(c.orgId, c.userId, docId))) return { error: "Not allowed" };
+  await db.delete(documentShare).where(and(eq(documentShare.documentId, docId), eq(documentShare.userId, targetUserId)));
+  revalidatePath(`/wiki/${docId}`);
   return { ok: true };
 }
 

@@ -419,6 +419,20 @@ export const documentComment = pgTable(
   (t) => [index("document_comment_doc_idx").on(t.documentId)],
 );
 
+// Explicit per-user share of a page — grants that user read access (even to a
+// draft, since it's a deliberate person-to-person grant).
+export const documentShare = pgTable(
+  "document_share",
+  {
+    id: text("id").primaryKey(),
+    documentId: text("document_id").notNull().references(() => document.id, { onDelete: "cascade" }),
+    userId: text("user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+    addedBy: text("added_by").references(() => user.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => [uniqueIndex("document_share_uidx").on(t.documentId, t.userId), index("document_share_doc_idx").on(t.documentId), index("document_share_user_idx").on(t.userId)],
+);
+
 // Version history for a document (snapshot on save; restore).
 export const documentVersion = pgTable(
   "document_version",

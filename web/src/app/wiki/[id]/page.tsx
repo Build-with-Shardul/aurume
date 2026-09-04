@@ -1,6 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import { getSession, getActiveMembership } from "@/lib/auth-server";
-import { getReadableDocument, canEditDocument, getDocumentMeta, listReactions, listComments } from "@/lib/wiki";
+import { getReadableDocument, canEditDocument, getDocumentMeta, listReactions, listComments, listShares, listShareableUsers } from "@/lib/wiki";
 import DocumentView from "./document-view";
 
 function fmtDate(d: Date | null) {
@@ -19,7 +19,12 @@ export default async function DocumentPage({ params }: { params: Promise<{ id: s
 
   const editable = canEditDocument(doc, session.user.id);
   const meta = await getDocumentMeta(doc);
-  const [reactions, comments] = await Promise.all([listReactions(doc.id, session.user.id), listComments(doc.id)]);
+  const [reactions, comments, shares, shareableUsers] = await Promise.all([
+    listReactions(doc.id, session.user.id),
+    listComments(doc.id),
+    listShares(doc.id),
+    editable ? listShareableUsers(m.orgId!, doc.id, doc.authorId) : Promise.resolve([]),
+  ]);
   const words = ((doc.publishedContentText ?? doc.contentText) || "").trim().split(/\s+/).filter(Boolean).length;
   const readMinutes = Math.max(1, Math.round(words / 200));
   // Readers see the published copy (falling back to working for pages published before
@@ -48,6 +53,8 @@ export default async function DocumentPage({ params }: { params: Promise<{ id: s
       totalViews={meta.totalViews}
       viewsByDate={meta.viewsByDate}
       sharedWith={meta.sharedWith}
+      shares={shares}
+      shareableUsers={shareableUsers}
       reactions={reactions}
       comments={comments}
       currentUserId={session.user.id}

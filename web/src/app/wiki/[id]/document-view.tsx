@@ -7,8 +7,9 @@ import ConfirmDialog from "../confirm-dialog";
 import Reactions from "./reactions";
 import Comments from "./comments";
 import History from "./history";
+import SharePanel from "./share-panel";
 import { renameDocument, updateDocumentBody, setDocumentVisibility, archiveDocument, deleteDocument, recordView, publishDocument } from "../actions";
-import type { ReactionSummary, CommentItem } from "@/lib/wiki";
+import type { ReactionSummary, CommentItem, ShareUser } from "@/lib/wiki";
 
 type Props = {
   id: string;
@@ -29,13 +30,15 @@ type Props = {
   totalViews: number;
   viewsByDate: { date: string; count: number }[];
   sharedWith: string[];
+  shares: ShareUser[];
+  shareableUsers: ShareUser[];
   reactions: ReactionSummary[];
   comments: CommentItem[];
   currentUserId: string;
 };
 
 export default function DocumentView(props: Props) {
-  const { id, title, readBody, workingBody, visibility, status, hasUnpublishedChanges, archived, editable, authorName, lastEditedByName, createdLabel, updatedLabel, readMinutes, totalViews, viewsByDate, sharedWith, reactions, comments, currentUserId } = props;
+  const { id, title, readBody, workingBody, visibility, status, hasUnpublishedChanges, archived, editable, authorName, lastEditedByName, createdLabel, updatedLabel, readMinutes, totalViews, viewsByDate, sharedWith, shares, shareableUsers, reactions, comments, currentUserId } = props;
   const router = useRouter();
   const [t, setT] = useState(title);
   const [vis, setVis] = useState(visibility);
@@ -45,6 +48,7 @@ export default function DocumentView(props: Props) {
   const [confirmDel, setConfirmDel] = useState(false);
   const [delBusy, setDelBusy] = useState(false);
   const [publishing, setPublishing] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
   const [ready, setReady] = useState(false);
   const [editContent, setEditContent] = useState<unknown>(workingBody);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -187,6 +191,25 @@ export default function DocumentView(props: Props) {
           </div>
         </div>
 
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <span className="inline-flex items-center gap-1 rounded-full bg-neutral-100 px-2 py-0.5 text-xs text-neutral-600" title={sharedWith.length ? sharedWith.join(", ") : "Not associated with any project"}>
+            🗂 {sharedWith.length} {sharedWith.length === 1 ? "project" : "projects"}
+          </span>
+          <button
+            onClick={() => editable && setShareOpen(true)}
+            disabled={!editable}
+            title={shares.length ? shares.map((s) => s.name).join(", ") : "Not shared with anyone"}
+            className={`inline-flex items-center gap-1 rounded-full bg-neutral-100 px-2 py-0.5 text-xs text-neutral-600 ${editable ? "hover:bg-neutral-200" : "cursor-default"}`}
+          >
+            👥 Shared with {shares.length} {shares.length === 1 ? "person" : "people"}
+          </button>
+          {editable && (
+            <button onClick={() => setShareOpen(true)} title="Share with more people" className="flex h-5 w-5 items-center justify-center rounded-full border border-neutral-300 text-neutral-500 hover:bg-neutral-100 hover:text-neutral-800">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M12 5v14M5 12h14" /></svg>
+            </button>
+          )}
+        </div>
+
         <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-neutral-500">
           {authorName && (
             <span className="flex items-center gap-1.5">
@@ -202,12 +225,6 @@ export default function DocumentView(props: Props) {
           <span>Updated {updatedLabel}{lastEditedByName ? ` by ${lastEditedByName}` : ""}</span>
           <span>·</span>
           <ViewsStat total={totalViews} byDate={viewsByDate} />
-          {sharedWith.length > 0 && (
-            <>
-              <span>·</span>
-              <span title={sharedWith.join(", ")}>Shared with {sharedWith.length === 1 ? sharedWith[0] : `${sharedWith.length} projects`}</span>
-            </>
-          )}
         </div>
 
         {archived && <div className="mt-3 rounded-lg bg-amber-50 px-3 py-1.5 text-xs text-amber-800">This page is archived.</div>}
@@ -220,6 +237,8 @@ export default function DocumentView(props: Props) {
           )}
         </div>
       </div>
+
+      {shareOpen && editable && <SharePanel docId={id} shares={shares} shareableUsers={shareableUsers} onClose={() => setShareOpen(false)} />}
 
       <Comments docId={id} comments={comments} currentUserId={currentUserId} />
 

@@ -1,6 +1,6 @@
 import { and, eq, or, desc, asc, inArray } from "drizzle-orm";
 import { db } from "./db";
-import { document, projectDocument, projectMember, documentView, documentReaction, documentComment, documentVersion, documentEvent, project, user } from "./db/schema";
+import { document, projectDocument, projectMember, documentView, documentReaction, documentComment, documentVersion, documentEvent, documentShare, project, member, user } from "./db/schema";
 
 function fmtWhen(d: Date) {
   return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }).format(d);
@@ -56,9 +56,17 @@ export async function getReadableDocument(orgId: string, userId: string, docId: 
     .limit(1);
   const doc = rows[0];
   if (!doc) return null;
-  // Drafts are visible only to their author, regardless of visibility/mappings.
-  if (doc.status === "draft") return doc.authorId === userId ? doc : null;
-  if (doc.visibility === "workspace" || doc.authorId === userId) return doc;
+  if (doc.authorId === userId) return doc;
+  // An explicit per-user share grants access — even for a draft.
+  const shared = await db
+    .select({ id: documentShare.id })
+    .from(documentShare)
+    .where(and(eq(documentShare.documentId, docId), eq(documentShare.userId, userId)))
+    .limit(1);
+  if (shared.length) return doc;
+  // Otherwise drafts are author-only.
+  if (doc.status === "draft") return null;
+  if (doc.visibility === "workspace") return doc;
   const granted = await db
     .select({ id: projectDocument.id })
     .from(projectDocument)
@@ -66,6 +74,29 @@ export async function getReadableDocument(orgId: string, userId: string, docId: 
     .where(and(eq(projectDocument.documentId, docId), eq(projectMember.userId, userId)))
     .limit(1);
   return granted.length ? doc : null;
+}
+
+export type ShareUser = { id: string; name: string };
+
+/** Users a page is explicitly shared with. */
+export async function listShares(docId: string): Promise<ShareUser[]> {
+  const rows = await db
+    .select({ id: user.id, name: user.name, email: user.email })
+    .from(documentShare)
+    .innerJoin(user, eq(user.id, documentShare.userId))
+    .where(eq(documentShare.documentId, docId));
+  return rows.map((r) => ({ id: r.id, name: r.name || r.email || "Someone" }));
+}
+
+/** Workspace members who could be added as sharers (excludes the author + already-shared). */
+export async function listShareableUsers(orgId: string, docId: string, authorId: string | null): Promise<ShareUser[]> {
+  const members = await db
+    .select({ id: user.id, name: user.name, email: user.email })
+    .from(member)
+    .innerJoin(user, eq(user.id, member.userId))
+    .where(eq(member.organizationId, orgId));
+  const already = new Set((await db.select({ userId: documentShare.userId }).from(documentShare).where(eq(documentShare.documentId, docId))).map((s) => s.userId));
+  return members.filter((m) => m.id !== authorId && !already.has(m.id)).map((m) => ({ id: m.id, name: m.name || m.email || "Someone" }));
 }
 
 /** Workspace docs are collaboratively editable; private docs only by their author. */
