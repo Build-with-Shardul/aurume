@@ -12,24 +12,33 @@ import { Table, TableRow, TableHeader, TableCell } from "@tiptap/extension-table
 import Image from "@tiptap/extension-image";
 import { WikiEmbed } from "./wiki-embed";
 import { CommentMark } from "./comment-mark";
-import { addInlineComment } from "./actions";
+import { addInlineComment, addComment, deleteComment } from "./actions";
 import { Btn, Sep, ColorPop, EmojiPop, LinkPop, ImageButton, EmbedPop, TableMenu } from "./editor-kit";
+import InlineThreadPopover, { type PopPos } from "./[id]/inline-thread-popover";
+import type { CommentItem } from "@/lib/wiki";
+
+export type InlineThread = { id: string; quote: string | null; items: CommentItem[] };
+
+type ActiveThread = { mode: "create" | "view"; rootId?: string; from?: number; to?: number; quote: string; pos: PopPos };
 
 export default function WikiEditor({
   docId,
   content,
   editable,
   onChange,
+  inlineThreads,
+  currentUserId,
 }: {
   docId: string;
   content: unknown;
   editable: boolean;
   onChange: (json: unknown, text: string) => void;
+  inlineThreads: InlineThread[];
+  currentUserId: string;
 }) {
   const router = useRouter();
-  const [draft, setDraft] = useState<{ from: number; to: number; quote: string } | null>(null);
-  const [commentBody, setCommentBody] = useState("");
-  const [saving, setSaving] = useState(false);
+  const [active, setActive] = useState<ActiveThread | null>(null);
+  const [busy, setBusy] = useState(false);
 
   const editor = useEditor({
     extensions: [
@@ -55,39 +64,95 @@ export default function WikiEditor({
 
   useEffect(() => () => editor?.destroy(), [editor]);
 
+  // Position the popover below the anchored range by default (so a first-line
+  // comment never lands behind the sticky toolbar); flip above only when there's
+  // no room below.
+  function computePos(rect: { left: number; right: number; top: number; bottom: number }): PopPos {
+    const vw = window.innerWidth, vh = window.innerHeight;
+    const tb = document.querySelector("[data-wiki-toolbar]")?.getBoundingClientRect();
+    const safeTop = (tb ? tb.bottom : 0) + 8;
+    const W = 320;
+    const left = Math.min(Math.max(rect.left, 8), Math.max(8, vw - W - 8));
+    const below = vh - rect.bottom > 260 || rect.top - safeTop < 260;
+    if (below) {
+      const top = Math.max(rect.bottom + 8, safeTop);
+      return { left, top, maxHeight: Math.max(120, vh - top - 110) };
+    }
+    const bottom = vh - rect.top + 8;
+    return { left, bottom, maxHeight: Math.max(120, vh - bottom - 110) };
+  }
+
+  // Selection → open the composer to create a new inline thread.
   function startComment() {
     if (!editor) return;
     const { from, to } = editor.state.selection;
     if (from === to) return;
-    setDraft({ from, to, quote: editor.state.doc.textBetween(from, to, " ") });
-    setCommentBody("");
+    const a = editor.view.coordsAtPos(from), b = editor.view.coordsAtPos(to);
+    const rect = { left: Math.min(a.left, b.left), right: Math.max(a.right, b.right), top: Math.min(a.top, b.top), bottom: Math.max(a.bottom, b.bottom) };
+    setActive({ mode: "create", from, to, quote: editor.state.doc.textBetween(from, to, " "), pos: computePos(rect) });
   }
 
-  async function submitComment() {
-    if (!editor || !draft || !commentBody.trim() || saving) return;
-    setSaving(true);
-    const r = await addInlineComment(docId, draft.quote, commentBody);
-    setSaving(false);
-    if (r && "id" in r && r.id) {
-      editor.chain().focus().setTextSelection({ from: draft.from, to: draft.to }).setMark("comment", { commentId: r.id }).run();
+  // Click a highlight → open its thread anchored at the highlight.
+  function onEditorClick(e: React.MouseEvent) {
+    const el = (e.target as HTMLElement).closest("[data-comment-id]") as HTMLElement | null;
+    const cid = el?.getAttribute("data-comment-id");
+    if (!cid || !el) return;
+    const thread = inlineThreads.find((t) => t.id === cid);
+    setActive({ mode: "view", rootId: cid, quote: thread?.quote ?? "", pos: computePos(el.getBoundingClientRect()) });
+  }
+
+  // Remove a specific comment highlight from the body (used when its root thread is deleted).
+  function removeCommentMark(commentId: string) {
+    if (!editor) return;
+    const type = editor.state.schema.marks.comment;
+    if (!type) return;
+    const tr = editor.state.tr;
+    let found = false;
+    editor.state.doc.descendants((node, pos) => {
+      if (!node.isText) return;
+      if (node.marks.some((m) => m.type === type && m.attrs.commentId === commentId)) {
+        tr.removeMark(pos, pos + node.nodeSize, type);
+        found = true;
+      }
+    });
+    if (found) editor.view.dispatch(tr);
+  }
+
+  async function submitActive(text: string) {
+    if (!active || busy) return;
+    setBusy(true);
+    if (active.mode === "create" && editor && active.from != null && active.to != null) {
+      const r = await addInlineComment(docId, active.quote, text);
+      if (r && "id" in r && r.id) {
+        editor.chain().focus().setTextSelection({ from: active.from, to: active.to }).setMark("comment", { commentId: r.id }).run();
+        setActive({ mode: "view", rootId: r.id, quote: active.quote, pos: active.pos });
+        router.refresh();
+      }
+    } else if (active.mode === "view" && active.rootId) {
+      await addComment(docId, active.rootId, text);
       router.refresh();
     }
-    setDraft(null);
-    setCommentBody("");
+    setBusy(false);
   }
 
-  // Click a highlighted range → scroll its thread into view in the comments section.
-  function onEditorClick(e: React.MouseEvent) {
-    const el = (e.target as HTMLElement).closest("[data-comment-id]");
-    const cid = el?.getAttribute("data-comment-id");
-    if (cid) document.getElementById(`comment-${cid}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+  async function deleteInline(id: string) {
+    setBusy(true);
+    await deleteComment(id);
+    setBusy(false);
+    if (active?.rootId === id) {
+      if (editable) removeCommentMark(id); // deleting the root clears its highlight
+      setActive(null);
+    }
+    router.refresh();
   }
+
+  const activeItems = active?.mode === "view" && active.rootId ? inlineThreads.find((t) => t.id === active.rootId)?.items ?? [] : [];
 
   return (
     <div>
       {editable && <Toolbar editor={editor} />}
       {editable && editor && (
-        <BubbleMenu editor={editor} shouldShow={({ editor: e, from, to }) => e.isEditable && from !== to}>
+        <BubbleMenu editor={editor} options={{ placement: "bottom", offset: 8, flip: { padding: 88 } }} shouldShow={({ editor: e, from, to }) => e.isEditable && from !== to}>
           <button onMouseDown={(ev) => ev.preventDefault()} onClick={startComment} className="rounded-lg bg-neutral-900 px-2.5 py-1 text-xs font-medium text-white shadow-lg hover:bg-neutral-800">
             💬 Comment
           </button>
@@ -97,27 +162,17 @@ export default function WikiEditor({
         <EditorContent editor={editor} />
       </div>
 
-      {draft && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setDraft(null)}>
-          <div className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
-            <h2 className="text-sm font-semibold text-neutral-900">Comment on selection</h2>
-            <p className="mt-1 line-clamp-2 rounded bg-yellow-50 px-2 py-1 text-xs italic text-neutral-600">&ldquo;{draft.quote}&rdquo;</p>
-            <textarea
-              autoFocus
-              value={commentBody}
-              onChange={(e) => setCommentBody(e.target.value)}
-              rows={3}
-              placeholder="Add your comment…"
-              className="mt-3 w-full resize-none rounded-lg border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-neutral-900"
-            />
-            <div className="mt-3 flex justify-end gap-2">
-              <button onClick={() => setDraft(null)} className="rounded-lg px-3 py-1.5 text-sm font-medium text-neutral-600 hover:bg-neutral-100">Cancel</button>
-              <button onClick={submitComment} disabled={saving || !commentBody.trim()} className="rounded-lg bg-neutral-900 px-4 py-1.5 text-sm font-medium text-white hover:bg-neutral-800 disabled:opacity-40">
-                {saving ? "Adding…" : "Comment"}
-              </button>
-            </div>
-          </div>
-        </div>
+      {active && (
+        <InlineThreadPopover
+          pos={active.pos}
+          quote={active.quote}
+          items={activeItems}
+          currentUserId={currentUserId}
+          busy={busy}
+          onSubmit={submitActive}
+          onDelete={deleteInline}
+          onClose={() => setActive(null)}
+        />
       )}
     </div>
   );
@@ -135,7 +190,7 @@ function Toolbar({ editor }: { editor: Editor | null }) {
   if (!editor) return null;
 
   return (
-    <div className="sticky top-0 z-10 mb-3 flex flex-wrap items-center gap-0.5 border-b border-neutral-200 bg-white/95 py-1.5 backdrop-blur">
+    <div data-wiki-toolbar className="sticky top-0 z-10 mb-3 flex flex-wrap items-center gap-0.5 border-b border-neutral-200 bg-white/95 py-1.5 backdrop-blur">
       <Btn e={editor} on={() => editor.chain().focus().toggleHeading({ level: 1 }).run()} active={editor.isActive("heading", { level: 1 })} title="Heading 1">H1</Btn>
       <Btn e={editor} on={() => editor.chain().focus().toggleHeading({ level: 2 }).run()} active={editor.isActive("heading", { level: 2 })} title="Heading 2">H2</Btn>
       <Btn e={editor} on={() => editor.chain().focus().toggleHeading({ level: 3 }).run()} active={editor.isActive("heading", { level: 3 })} title="Heading 3">H3</Btn>

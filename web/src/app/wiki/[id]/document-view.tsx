@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import WikiEditor from "../wiki-editor";
+import WikiEditor, { type InlineThread } from "../wiki-editor";
 import ConfirmDialog from "../confirm-dialog";
 import Reactions from "./reactions";
 import Comments from "./comments";
@@ -56,6 +56,29 @@ export default function DocumentView(props: Props) {
   const booted = useRef(false);
 
   const key = `aurume.wiki.pending.${id}`;
+
+  // Inline-anchored threads (a root comment carrying a `quote`) live only in the
+  // editor as bubbles; everything else is a page-level comment for the section below.
+  const { pageComments, inlineThreads } = useMemo(() => {
+    const parentMap = new Map<string, string | null>(comments.map((c) => [c.id, c.parentId]));
+    const inlineRootIds = new Set(comments.filter((c) => !c.parentId && c.quote).map((c) => c.id));
+    const inlineRootOf = (cid: string): string | null => {
+      let cur: string | null = cid;
+      const seen = new Set<string>();
+      while (cur && !seen.has(cur)) {
+        seen.add(cur);
+        if (inlineRootIds.has(cur)) return cur;
+        cur = parentMap.get(cur) ?? null;
+      }
+      return null;
+    };
+    const page: CommentItem[] = [];
+    for (const c of comments) if (!inlineRootOf(c.id)) page.push(c);
+    const threads: InlineThread[] = comments
+      .filter((c) => inlineRootIds.has(c.id))
+      .map((root) => ({ id: root.id, quote: root.quote, items: comments.filter((c) => inlineRootOf(c.id) === root.id) }));
+    return { pageComments: page, inlineThreads: threads };
+  }, [comments]);
 
   async function flush() {
     if (!pending.current) return;
@@ -234,7 +257,7 @@ export default function DocumentView(props: Props) {
 
         <div className="mt-5">
           {ready ? (
-            <WikiEditor key={mode} docId={id} content={mode === "edit" ? editContent : readBody} editable={mode === "edit"} onChange={onBody} />
+            <WikiEditor key={mode} docId={id} content={mode === "edit" ? editContent : readBody} editable={mode === "edit"} onChange={onBody} inlineThreads={inlineThreads} currentUserId={currentUserId} />
           ) : (
             <div className="min-h-[320px]" />
           )}
@@ -243,7 +266,7 @@ export default function DocumentView(props: Props) {
 
       {shareOpen && editable && <SharePanel docId={id} shares={shares} shareableUsers={shareableUsers} onClose={() => setShareOpen(false)} />}
 
-      <Comments docId={id} comments={comments} currentUserId={currentUserId} />
+      <Comments docId={id} comments={pageComments} currentUserId={currentUserId} />
 
       <ConfirmDialog
         open={confirmDel}
