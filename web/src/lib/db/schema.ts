@@ -904,3 +904,57 @@ export const diagramShare = pgTable(
     index("diagram_share_user_idx").on(t.userId),
   ],
 );
+
+// Maps a diagram into a project's knowledge base (mirrors project_document).
+export const projectDiagram = pgTable(
+  "project_diagram",
+  {
+    id: text("id").primaryKey(),
+    projectId: text("project_id").notNull().references(() => project.id, { onDelete: "cascade" }),
+    diagramId: text("diagram_id").notNull().references(() => diagram.id, { onDelete: "cascade" }),
+    addedBy: text("added_by").references(() => user.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => [
+    uniqueIndex("project_diagram_uidx").on(t.projectId, t.diagramId),
+    index("project_diagram_project_idx").on(t.projectId),
+    index("project_diagram_diagram_idx").on(t.diagramId),
+  ],
+);
+
+export const diagramComment = pgTable(
+  "diagram_comment",
+  {
+    id: text("id").primaryKey(),
+    diagramId: text("diagram_id").notNull().references(() => diagram.id, { onDelete: "cascade" }),
+    parentId: text("parent_id"),
+    authorId: text("author_id").references(() => user.id, { onDelete: "set null" }),
+    body: text("body").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (t) => [index("diagram_comment_diagram_idx").on(t.diagramId)],
+);
+
+export const diagramReaction = pgTable(
+  "diagram_reaction",
+  {
+    id: text("id").primaryKey(),
+    diagramId: text("diagram_id").notNull().references(() => diagram.id, { onDelete: "cascade" }),
+    userId: text("user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+    emoji: text("emoji").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => [uniqueIndex("diagram_reaction_uidx").on(t.diagramId, t.userId, t.emoji), index("diagram_reaction_diagram_idx").on(t.diagramId)],
+);
+
+export const diagramView = pgTable(
+  "diagram_view",
+  {
+    id: text("id").primaryKey(),
+    diagramId: text("diagram_id").notNull().references(() => diagram.id, { onDelete: "cascade" }),
+    userId: text("user_id").references(() => user.id, { onDelete: "set null" }),
+    viewedAt: timestamp("viewed_at").defaultNow().notNull(),
+  },
+  (t) => [index("diagram_view_diagram_idx").on(t.diagramId)],
+);
