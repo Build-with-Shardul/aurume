@@ -858,3 +858,24 @@ export const aiGeneration = pgTable(
   },
   (t) => [index("ai_generation_org_idx").on(t.organizationId)],
 );
+
+// draw.io diagrams. The XML is the source of truth; `preview` is an exported SVG used
+// for inline rendering in the Diagrams list and when embedded in a wiki page.
+export const diagram = pgTable(
+  "diagram",
+  {
+    id: text("id").primaryKey(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    title: text("title").notNull().default("Untitled diagram"),
+    xml: text("xml"),
+    preview: text("preview"),
+    authorId: text("author_id").references(() => user.id, { onDelete: "set null" }),
+    createdBy: text("created_by").references(() => user.id, { onDelete: "set null" }),
+    lastEditedBy: text("last_edited_by").references(() => user.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (t) => [index("diagram_org_idx").on(t.organizationId)],
+);
