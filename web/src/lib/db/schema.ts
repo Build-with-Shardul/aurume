@@ -325,6 +325,83 @@ export const knowledgeItem = pgTable(
   ],
 );
 
+// A Wiki page — AUTHORED (block editor), hierarchical (parentId tree), versioned.
+// Distinct from knowledge_item (uploads). Feeds AI grounding via `contentText`,
+// but always access-scoped (see below).
+//
+// Access model (hard rule): a user may read a document iff
+//   visibility = "workspace"  OR  author = user  OR
+//   the doc is mapped (project_document) to a project the user is a member of.
+// AI grounding for a given asker is filtered to exactly this readable set.
+export const document = pgTable(
+  "document",
+  {
+    id: text("id").primaryKey(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    parentId: text("parent_id"), // self-ref (app-enforced; nullable = top-level page)
+    title: text("title").notNull().default("Untitled"),
+    icon: text("icon"), // emoji
+    body: jsonb("body"), // TipTap block JSON
+    contentText: text("content_text"), // extracted plain text, for retrieval
+    visibility: text("visibility").notNull().default("workspace"), // workspace | private
+    archived: boolean("archived").notNull().default(false),
+    orderIndex: integer("order_index").notNull().default(0),
+    authorId: text("author_id").references(() => user.id, { onDelete: "set null" }),
+    createdBy: text("created_by").references(() => user.id, { onDelete: "set null" }),
+    lastEditedBy: text("last_edited_by").references(() => user.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (t) => [index("document_org_idx").on(t.organizationId), index("document_parent_idx").on(t.parentId)],
+);
+
+// A page view, logged per open — powers date-wise view stats (kept simple for now).
+export const documentView = pgTable(
+  "document_view",
+  {
+    id: text("id").primaryKey(),
+    documentId: text("document_id").notNull().references(() => document.id, { onDelete: "cascade" }),
+    userId: text("user_id").references(() => user.id, { onDelete: "set null" }),
+    viewedAt: timestamp("viewed_at").defaultNow().notNull(),
+  },
+  (t) => [index("document_view_doc_idx").on(t.documentId)],
+);
+
+// Version history for a document (snapshot on save; restore).
+export const documentVersion = pgTable(
+  "document_version",
+  {
+    id: text("id").primaryKey(),
+    documentId: text("document_id").notNull().references(() => document.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    body: jsonb("body"),
+    editedBy: text("edited_by").references(() => user.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => [index("document_version_doc_idx").on(t.documentId)],
+);
+
+// Maps an org Wiki document into a project's knowledge base. Also acts as a
+// READ-ACCESS GRANT: a private doc mapped here becomes readable by that
+// project's members (D-A). Reference, not copy — the doc stays owned by the Wiki.
+export const projectDocument = pgTable(
+  "project_document",
+  {
+    id: text("id").primaryKey(),
+    projectId: text("project_id").notNull().references(() => project.id, { onDelete: "cascade" }),
+    documentId: text("document_id").notNull().references(() => document.id, { onDelete: "cascade" }),
+    addedBy: text("added_by").references(() => user.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => [
+    uniqueIndex("project_document_uidx").on(t.projectId, t.documentId),
+    index("project_document_project_idx").on(t.projectId),
+    index("project_document_doc_idx").on(t.documentId),
+  ],
+);
+
 // A Feature is the unit a playbook is generated for — the head of the
 // Feature → Playbook → Stories → Tests delivery chain.
 export const feature = pgTable(

@@ -32,6 +32,8 @@ export default function AppChrome({
   const pathname = usePathname();
   const bare = !authed || BARE.some((p) => pathname === p || pathname.startsWith(p + "/"));
   if (bare) return <>{children}</>;
+  // Sections that render their own contextual sidebar (so we skip the generic one).
+  const selfSidebar = pathname === "/wiki" || pathname.startsWith("/wiki/");
 
   return (
     <div className="flex h-screen w-full flex-col overflow-hidden bg-neutral-50 text-neutral-900">
@@ -43,7 +45,7 @@ export default function AppChrome({
       )}
       <div className="flex min-h-0 flex-1">
         <AppIconRail instanceAdmin={instanceAdmin} />
-        <AppSidebar user={user} role={role} canManage={canManage} />
+        {!selfSidebar && <AppSidebar user={user} role={role} canManage={canManage} />}
         <div className="min-w-0 flex-1 overflow-y-auto">{children}</div>
         <AppAssistant />
       </div>
