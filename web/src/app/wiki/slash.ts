@@ -1,4 +1,5 @@
 import { Extension, type Editor, type Range } from "@tiptap/core";
+import { PluginKey } from "@tiptap/pm/state";
 import Suggestion from "@tiptap/suggestion";
 import { domListRenderer } from "./suggest-popup";
 import { createDiagram } from "../diagrams/actions";
@@ -33,6 +34,7 @@ export function buildSlash() {
       return [
         Suggestion<SlashCmd>({
           editor: this.editor,
+          pluginKey: new PluginKey("slashSuggestion"),
           char: "/",
           startOfLine: false,
           allowSpaces: false,

@@ -1,4 +1,5 @@
 import { Node, mergeAttributes } from "@tiptap/core";
+import { PluginKey } from "@tiptap/pm/state";
 import Suggestion from "@tiptap/suggestion";
 import { domListRenderer } from "./suggest-popup";
 
@@ -62,6 +63,7 @@ export function buildPageRef(pages: RefPage[]) {
       return [
         Suggestion<RefPage>({
           editor,
+          pluginKey: new PluginKey("pageRefSuggestion"),
           char: "[[",
           allowSpaces: true,
           startOfLine: false,
