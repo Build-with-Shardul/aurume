@@ -1,9 +1,9 @@
 "use server";
 
-import { eq, inArray } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
-import { document, documentView, documentAsset } from "@/lib/db/schema";
+import { document, documentView, documentAsset, documentReaction, documentComment } from "@/lib/db/schema";
 import { getSession, getActiveMembership } from "@/lib/auth-server";
 import { getReadableDocument, canEditDocument } from "@/lib/wiki";
 import { buildKey, saveFile } from "@/lib/storage";
@@ -104,6 +104,58 @@ export async function recordView(id: string) {
   const doc = await getReadableDocument(c.orgId, c.userId, id);
   if (!doc) return { error: "Not found" };
   await db.insert(documentView).values({ id: crypto.randomUUID(), documentId: id, userId: c.userId });
+  return { ok: true };
+}
+
+/** Toggle the current user's emoji reaction on a page. */
+export async function toggleReaction(docId: string, emoji: string) {
+  const c = await ctx();
+  if (!c) return { error: "Not signed in" };
+  const doc = await getReadableDocument(c.orgId, c.userId, docId);
+  if (!doc) return { error: "Not found" };
+  const existing = await db
+    .select({ id: documentReaction.id })
+    .from(documentReaction)
+    .where(and(eq(documentReaction.documentId, docId), eq(documentReaction.userId, c.userId), eq(documentReaction.emoji, emoji)))
+    .limit(1);
+  if (existing[0]) await db.delete(documentReaction).where(eq(documentReaction.id, existing[0].id));
+  else await db.insert(documentReaction).values({ id: crypto.randomUUID(), documentId: docId, userId: c.userId, emoji });
+  revalidatePath(`/wiki/${docId}`);
+  return { ok: true };
+}
+
+/** Add a comment (or a reply when parentId is set). Only readers of the page may comment. */
+export async function addComment(docId: string, parentId: string | null, body: string) {
+  const c = await ctx();
+  if (!c) return { error: "Not signed in" };
+  const text = (body || "").trim();
+  if (!text) return { error: "Empty comment" };
+  const doc = await getReadableDocument(c.orgId, c.userId, docId);
+  if (!doc) return { error: "Not found" };
+  await db.insert(documentComment).values({ id: crypto.randomUUID(), documentId: docId, parentId: parentId ?? null, authorId: c.userId, body: text });
+  revalidatePath(`/wiki/${docId}`);
+  return { ok: true };
+}
+
+/** Delete a comment (author only) and any nested replies. */
+export async function deleteComment(commentId: string) {
+  const c = await ctx();
+  if (!c) return { error: "Not signed in" };
+  const rows = await db.select().from(documentComment).where(eq(documentComment.id, commentId)).limit(1);
+  const cm = rows[0];
+  if (!cm) return { error: "Not found" };
+  const doc = await getReadableDocument(c.orgId, c.userId, cm.documentId);
+  if (!doc || cm.authorId !== c.userId) return { error: "Not allowed" };
+  const all = await db.select({ id: documentComment.id, parentId: documentComment.parentId }).from(documentComment).where(eq(documentComment.documentId, cm.documentId));
+  const toDelete = new Set<string>([commentId]);
+  for (let changed = true; changed; ) {
+    changed = false;
+    for (const r of all) {
+      if (r.parentId && toDelete.has(r.parentId) && !toDelete.has(r.id)) { toDelete.add(r.id); changed = true; }
+    }
+  }
+  await db.delete(documentComment).where(inArray(documentComment.id, [...toDelete]));
+  revalidatePath(`/wiki/${cm.documentId}`);
   return { ok: true };
 }
 

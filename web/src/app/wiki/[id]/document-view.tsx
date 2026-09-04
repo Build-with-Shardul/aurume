@@ -4,7 +4,10 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import WikiEditor from "../wiki-editor";
 import ConfirmDialog from "../confirm-dialog";
+import Reactions from "./reactions";
+import Comments from "./comments";
 import { renameDocument, updateDocumentBody, setDocumentVisibility, archiveDocument, deleteDocument, recordView } from "../actions";
+import type { ReactionSummary, CommentItem } from "@/lib/wiki";
 
 type Props = {
   id: string;
@@ -21,6 +24,9 @@ type Props = {
   readMinutes: number;
   totalViews: number;
   viewsByDate: { date: string; count: number }[];
+  reactions: ReactionSummary[];
+  comments: CommentItem[];
+  currentUserId: string;
 };
 
 function initials(name: string | null) {
@@ -31,7 +37,7 @@ function initials(name: string | null) {
 }
 
 export default function DocumentView(props: Props) {
-  const { id, title, body, visibility, archived, editable, authorName, lastEditedByName, createdLabel, updatedLabel, readMinutes, totalViews, viewsByDate } = props;
+  const { id, title, body, visibility, archived, editable, authorName, lastEditedByName, createdLabel, updatedLabel, readMinutes, totalViews, viewsByDate, reactions, comments, currentUserId } = props;
   const router = useRouter();
   const [t, setT] = useState(title);
   const [vis, setVis] = useState(visibility);
@@ -86,6 +92,7 @@ export default function DocumentView(props: Props) {
   }
 
   return (
+    <>
     <div className="mx-auto max-w-3xl px-8 py-10">
       <div className="mb-6 flex h-6 items-center justify-between">
         <span className="text-xs text-neutral-400">{status === "saving" ? "Saving…" : status === "saved" ? "Saved" : ""}</span>
@@ -127,11 +134,16 @@ export default function DocumentView(props: Props) {
         <ViewsStat total={totalViews} byDate={viewsByDate} />
       </div>
 
+      <Reactions docId={id} reactions={reactions} />
+
       {archived && <div className="mt-3 rounded-lg bg-amber-50 px-3 py-1.5 text-xs text-amber-800">This page is archived.</div>}
 
       <div className="mt-5">
         <WikiEditor content={body} editable={editable} onChange={onBody} />
       </div>
+    </div>
+
+      <Comments docId={id} comments={comments} currentUserId={currentUserId} />
 
       <ConfirmDialog
         open={confirmDel}
@@ -141,7 +153,7 @@ export default function DocumentView(props: Props) {
         onConfirm={confirmDelete}
         onCancel={() => setConfirmDel(false)}
       />
-    </div>
+    </>
   );
 }
 

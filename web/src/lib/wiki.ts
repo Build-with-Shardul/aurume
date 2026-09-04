@@ -1,6 +1,10 @@
-import { and, eq, or, desc, inArray } from "drizzle-orm";
+import { and, eq, or, desc, asc, inArray } from "drizzle-orm";
 import { db } from "./db";
-import { document, projectDocument, projectMember, documentView, user } from "./db/schema";
+import { document, projectDocument, projectMember, documentView, documentReaction, documentComment, user } from "./db/schema";
+
+function fmtWhen(d: Date) {
+  return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }).format(d);
+}
 
 export type WikiNode = {
   id: string;
@@ -92,4 +96,47 @@ export async function getDocumentMeta(doc: { id: string; authorId: string | null
   const viewsByDate = [...byDate.entries()].map(([date, count]) => ({ date, count })).sort((a, b) => (a.date < b.date ? 1 : -1));
 
   return { authorName: nameOf(doc.authorId), lastEditedByName: nameOf(doc.lastEditedBy), totalViews: views.length, viewsByDate };
+}
+
+export type ReactionSummary = { emoji: string; count: number; mine: boolean };
+
+/** Aggregated reaction counts for a document, marking the current user's reactions. */
+export async function listReactions(docId: string, userId: string): Promise<ReactionSummary[]> {
+  const rows = await db.select({ emoji: documentReaction.emoji, userId: documentReaction.userId }).from(documentReaction).where(eq(documentReaction.documentId, docId));
+  const map = new Map<string, { count: number; mine: boolean }>();
+  for (const r of rows) {
+    const cur = map.get(r.emoji) ?? { count: 0, mine: false };
+    cur.count += 1;
+    if (r.userId === userId) cur.mine = true;
+    map.set(r.emoji, cur);
+  }
+  return [...map.entries()].map(([emoji, v]) => ({ emoji, count: v.count, mine: v.mine })).sort((a, b) => b.count - a.count);
+}
+
+export type CommentItem = { id: string; parentId: string | null; authorId: string | null; authorName: string; body: string; createdLabel: string };
+
+/** All comments on a document, oldest first (client builds the tree via parentId). */
+export async function listComments(docId: string): Promise<CommentItem[]> {
+  const rows = await db
+    .select({
+      id: documentComment.id,
+      parentId: documentComment.parentId,
+      authorId: documentComment.authorId,
+      body: documentComment.body,
+      createdAt: documentComment.createdAt,
+      authorName: user.name,
+      authorEmail: user.email,
+    })
+    .from(documentComment)
+    .leftJoin(user, eq(user.id, documentComment.authorId))
+    .where(eq(documentComment.documentId, docId))
+    .orderBy(asc(documentComment.createdAt));
+  return rows.map((r) => ({
+    id: r.id,
+    parentId: r.parentId,
+    authorId: r.authorId,
+    authorName: r.authorName || r.authorEmail || "Someone",
+    body: r.body,
+    createdLabel: fmtWhen(r.createdAt),
+  }));
 }

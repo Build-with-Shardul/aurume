@@ -385,6 +385,35 @@ export const documentView = pgTable(
   (t) => [index("document_view_doc_idx").on(t.documentId)],
 );
 
+// An emoji reaction on a page (one per user+emoji, toggled).
+export const documentReaction = pgTable(
+  "document_reaction",
+  {
+    id: text("id").primaryKey(),
+    documentId: text("document_id").notNull().references(() => document.id, { onDelete: "cascade" }),
+    userId: text("user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+    emoji: text("emoji").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => [uniqueIndex("document_reaction_uidx").on(t.documentId, t.userId, t.emoji), index("document_reaction_doc_idx").on(t.documentId)],
+);
+
+// A page comment; nested via parentId (app-enforced). Readable/writable only by
+// users who can read the page (checked in the actions).
+export const documentComment = pgTable(
+  "document_comment",
+  {
+    id: text("id").primaryKey(),
+    documentId: text("document_id").notNull().references(() => document.id, { onDelete: "cascade" }),
+    parentId: text("parent_id"),
+    authorId: text("author_id").references(() => user.id, { onDelete: "set null" }),
+    body: text("body").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (t) => [index("document_comment_doc_idx").on(t.documentId)],
+);
+
 // Version history for a document (snapshot on save; restore).
 export const documentVersion = pgTable(
   "document_version",
