@@ -12,8 +12,9 @@ import { Table, TableRow, TableHeader, TableCell } from "@tiptap/extension-table
 import Image from "@tiptap/extension-image";
 import { WikiEmbed } from "./wiki-embed";
 import { CommentMark } from "./comment-mark";
+import { buildPageRef, type RefPage } from "./pageref";
 import { addInlineComment, addComment, deleteComment } from "./actions";
-import { Btn, Sep, ColorPop, EmojiPop, LinkPop, ImageButton, EmbedPop, TableMenu } from "./editor-kit";
+import { Btn, Sep, ColorPop, EmojiPop, LinkPop, ImageButton, EmbedPop, TableMenu, PageRefButton } from "./editor-kit";
 import InlineThreadPopover, { type PopPos } from "./[id]/inline-thread-popover";
 import type { CommentItem, ShareUser } from "@/lib/wiki";
 
@@ -29,6 +30,7 @@ export default function WikiEditor({
   inlineThreads,
   currentUserId,
   mentionableUsers,
+  pageRefs,
 }: {
   docId: string;
   content: unknown;
@@ -37,6 +39,7 @@ export default function WikiEditor({
   inlineThreads: InlineThread[];
   currentUserId: string;
   mentionableUsers: ShareUser[];
+  pageRefs: RefPage[];
 }) {
   const router = useRouter();
   const [active, setActive] = useState<ActiveThread | null>(null);
@@ -56,6 +59,7 @@ export default function WikiEditor({
       Image.configure({ HTMLAttributes: { class: "wiki-image" } }),
       WikiEmbed,
       CommentMark,
+      buildPageRef(pageRefs),
     ],
     content: (content as object) ?? "",
     editable,
@@ -94,8 +98,14 @@ export default function WikiEditor({
     setActive({ mode: "create", from, to, quote: editor.state.doc.textBetween(from, to, " "), pos: computePos(rect) });
   }
 
-  // Click a highlight → open its thread anchored at the highlight.
+  // Click a page reference → navigate to it (plain click in read mode; ⌘/Ctrl-click while editing).
   function onEditorClick(e: React.MouseEvent) {
+    const ref = (e.target as HTMLElement).closest("[data-page-ref]") as HTMLElement | null;
+    if (ref) {
+      const pid = ref.getAttribute("data-page-ref");
+      if (pid && (!editable || e.metaKey || e.ctrlKey)) { e.preventDefault(); router.push(`/wiki/${pid}`); return; }
+      if (pid && editable) return; // editing: let the cursor land, ⌘-click to open
+    }
     const el = (e.target as HTMLElement).closest("[data-comment-id]") as HTMLElement | null;
     const cid = el?.getAttribute("data-comment-id");
     if (!cid || !el) return;
@@ -152,7 +162,7 @@ export default function WikiEditor({
 
   return (
     <div>
-      {editable && <Toolbar editor={editor} />}
+      {editable && <Toolbar editor={editor} pageRefs={pageRefs} />}
       {editable && editor && (
         <BubbleMenu editor={editor} options={{ placement: "bottom", offset: 8, flip: { padding: 88 } }} shouldShow={({ editor: e, from, to }) => e.isEditable && from !== to}>
           <button onMouseDown={(ev) => ev.preventDefault()} onClick={startComment} className="rounded-lg bg-neutral-900 px-2.5 py-1 text-xs font-medium text-white shadow-lg hover:bg-neutral-800">
@@ -181,7 +191,7 @@ export default function WikiEditor({
   );
 }
 
-function Toolbar({ editor }: { editor: Editor | null }) {
+function Toolbar({ editor, pageRefs }: { editor: Editor | null; pageRefs: RefPage[] }) {
   const [, force] = useState(0);
   useEffect(() => {
     if (!editor) return;
@@ -218,6 +228,7 @@ function Toolbar({ editor }: { editor: Editor | null }) {
       <Btn e={editor} on={() => editor.chain().focus().toggleBlockquote().run()} active={editor.isActive("blockquote")} title="Quote">❝</Btn>
       <Btn e={editor} on={() => editor.chain().focus().toggleCodeBlock().run()} active={editor.isActive("codeBlock")} title="Code block">Code</Btn>
       <LinkPop editor={editor} />
+      <PageRefButton editor={editor} pages={pageRefs} />
       <EmojiPop editor={editor} />
       <TableMenu editor={editor} />
       <ImageButton editor={editor} />

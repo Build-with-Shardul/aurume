@@ -47,7 +47,7 @@ export default function InlineThreadPopover({
       const t = e.target as Node;
       if (ref.current && ref.current.contains(t)) return;
       // Clicks inside the mention suggestion menu (rendered on document.body) must not close.
-      if ((t as HTMLElement).closest?.(".wiki-mention-menu")) return;
+      if ((t as HTMLElement).closest?.(".wiki-suggest-menu")) return;
       onClose();
     };
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };

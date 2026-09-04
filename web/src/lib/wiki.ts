@@ -76,6 +76,13 @@ export async function getReadableDocument(orgId: string, userId: string, docId: 
   return granted.length ? doc : null;
 }
 
+/** Pages this user can reference with a [[link]] (readable, non-archived, excluding the
+ * current page). References store the id, so they survive the target being moved. */
+export async function listReferenceablePages(orgId: string, userId: string, excludeId: string): Promise<{ id: string; title: string }[]> {
+  const tree = await listWikiTree(orgId, userId);
+  return tree.filter((n) => n.id !== excludeId && !n.archived).map((n) => ({ id: n.id, title: n.title }));
+}
+
 export type ShareUser = { id: string; name: string };
 
 /** Users a page is explicitly shared with. */

@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { type Editor } from "@tiptap/react";
 import { toEmbedUrl } from "./wiki-embed";
 import { uploadWikiImage } from "./actions";
+import type { RefPage } from "./pageref";
 
 export const EMOJIS = ["😀", "😄", "😉", "😎", "🤔", "👍", "🙏", "🎉", "🔥", "✅", "❌", "⚠️", "💡", "📌", "⭐", "❤️", "🚀", "📝", "🐛", "✨"];
 
@@ -200,6 +201,49 @@ export function TableMenu({ editor, align }: { editor: Editor; align?: "left" | 
               <MenuBtn onClick={() => editor.chain().focus().deleteColumn().run()}>Delete column</MenuBtn>
               <MenuBtn danger onClick={() => { editor.chain().focus().deleteTable().run(); close(); }}>Delete table</MenuBtn>
             </>
+          )}
+        </div>
+      )}
+    </Pop>
+  );
+}
+
+export function PageRefButton({ editor, pages, align }: { editor: Editor; pages: RefPage[]; align?: "left" | "right" }) {
+  const [q, setQ] = useState("");
+  const list = useMemo(() => {
+    const t = q.trim().toLowerCase();
+    return pages.filter((p) => !t || (p.title || "Untitled").toLowerCase().includes(t)).slice(0, 30);
+  }, [q, pages]);
+  return (
+    <Pop align={align} label="⧉" title="Link to another page ( [[ )">
+      {(close) => (
+        <div className="w-60" onMouseDown={(e) => e.preventDefault()}>
+          <input
+            autoFocus
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Search pages…"
+            className="mb-1.5 w-full rounded border border-neutral-300 px-2 py-1 text-sm outline-none focus:border-neutral-900"
+          />
+          {list.length === 0 ? (
+            <p className="px-1 py-1.5 text-xs text-neutral-400">No pages found.</p>
+          ) : (
+            <ul className="max-h-56 space-y-0.5 overflow-y-auto">
+              {list.map((p) => (
+                <li key={p.id}>
+                  <button
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => {
+                      editor.chain().focus().insertContent([{ type: "pageRef", attrs: { pageId: p.id, label: p.title } }, { type: "text", text: " " }]).run();
+                      close();
+                    }}
+                    className="block w-full truncate rounded px-2 py-1.5 text-left text-sm text-neutral-700 hover:bg-neutral-50"
+                  >
+                    ↗ {p.title || "Untitled"}
+                  </button>
+                </li>
+              ))}
+            </ul>
           )}
         </div>
       )}

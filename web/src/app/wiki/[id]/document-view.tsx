@@ -36,10 +36,11 @@ type Props = {
   comments: CommentItem[];
   currentUserId: string;
   mentionableUsers: ShareUser[];
+  pageRefs: { id: string; title: string }[];
 };
 
 export default function DocumentView(props: Props) {
-  const { id, title, readBody, workingBody, visibility, status, hasUnpublishedChanges, archived, editable, authorName, lastEditedByName, createdLabel, updatedLabel, readMinutes, totalViews, viewsByDate, sharedWith, shares, shareableUsers, reactions, comments, currentUserId, mentionableUsers } = props;
+  const { id, title, readBody, workingBody, visibility, status, hasUnpublishedChanges, archived, editable, authorName, lastEditedByName, createdLabel, updatedLabel, readMinutes, totalViews, viewsByDate, sharedWith, shares, shareableUsers, reactions, comments, currentUserId, mentionableUsers, pageRefs } = props;
   const router = useRouter();
   const [t, setT] = useState(title);
   const [vis, setVis] = useState(visibility);
@@ -259,7 +260,7 @@ export default function DocumentView(props: Props) {
 
         <div className="mt-5">
           {ready ? (
-            <WikiEditor key={mode} docId={id} content={mode === "edit" ? editContent : readBody} editable={mode === "edit"} onChange={onBody} inlineThreads={inlineThreads} currentUserId={currentUserId} mentionableUsers={mentionableUsers} />
+            <WikiEditor key={mode} docId={id} content={mode === "edit" ? editContent : readBody} editable={mode === "edit"} onChange={onBody} inlineThreads={inlineThreads} currentUserId={currentUserId} mentionableUsers={mentionableUsers} pageRefs={pageRefs} />
           ) : (
             <div className="min-h-[320px]" />
           )}
