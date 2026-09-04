@@ -73,7 +73,8 @@ export async function updateDocumentBody(id: string, body: unknown, contentText:
   if (!c) return { error: "Not signed in" };
   const doc = await editable(c.orgId, c.userId, id);
   if (!doc) return { error: "Not allowed" };
-  await db.update(document).set({ body: body as never, contentText, lastEditedBy: c.userId, updatedAt: new Date() }).where(eq(document.id, id));
+  // Edits go to the WORKING copy. If the page is published, this creates unpublished changes.
+  await db.update(document).set({ body: body as never, contentText, hasUnpublishedChanges: doc.status === "published", lastEditedBy: c.userId, updatedAt: new Date() }).where(eq(document.id, id));
   await maybeSnapshot(id, c.userId, doc.title, body, contentText);
   return { ok: true };
 }
@@ -84,6 +85,24 @@ export async function setDocumentVisibility(id: string, visibility: "workspace" 
   if (!(await editable(c.orgId, c.userId, id))) return { error: "Not allowed" };
   await db.update(document).set({ visibility, lastEditedBy: c.userId, updatedAt: new Date() }).where(eq(document.id, id));
   await logEvent(id, visibility === "private" ? "visibility_private" : "visibility_workspace", null, c.userId);
+  revalidatePath("/wiki");
+  revalidatePath(`/wiki/${id}`);
+  return { ok: true };
+}
+
+/** Publish: promote the working copy to the published copy (readers now see it) and
+ * clear unpublished-changes. Works for first publish and every re-publish. */
+export async function publishDocument(id: string) {
+  const c = await ctx();
+  if (!c) return { error: "Not signed in" };
+  const doc = await editable(c.orgId, c.userId, id);
+  if (!doc) return { error: "Not allowed" };
+  const wasPublished = doc.status === "published";
+  await db
+    .update(document)
+    .set({ status: "published", publishedBody: doc.body as never, publishedContentText: doc.contentText, hasUnpublishedChanges: false, lastEditedBy: c.userId, updatedAt: new Date() })
+    .where(eq(document.id, id));
+  await logEvent(id, wasPublished ? "republished" : "published", null, c.userId);
   revalidatePath("/wiki");
   revalidatePath(`/wiki/${id}`);
   return { ok: true };

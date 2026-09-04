@@ -20,17 +20,24 @@ export default async function DocumentPage({ params }: { params: Promise<{ id: s
   const editable = canEditDocument(doc, session.user.id);
   const meta = await getDocumentMeta(doc);
   const [reactions, comments] = await Promise.all([listReactions(doc.id, session.user.id), listComments(doc.id)]);
-  const words = (doc.contentText || "").trim().split(/\s+/).filter(Boolean).length;
+  const words = ((doc.publishedContentText ?? doc.contentText) || "").trim().split(/\s+/).filter(Boolean).length;
   const readMinutes = Math.max(1, Math.round(words / 200));
+  // Readers see the published copy (falling back to working for pages published before
+  // staged-changes existed / for the author's own draft). Editors also get the working copy.
+  const readBody = doc.publishedBody ?? doc.body ?? null;
+  const workingBody = editable ? doc.body ?? null : null;
 
   return (
     <DocumentView
       key={doc.id}
       id={doc.id}
       title={doc.title}
-      body={doc.body ?? null}
+      readBody={readBody}
+      workingBody={workingBody}
       icon={doc.icon}
       visibility={doc.visibility as "workspace" | "private"}
+      status={doc.status as "draft" | "published"}
+      hasUnpublishedChanges={doc.hasUnpublishedChanges}
       archived={doc.archived}
       editable={editable}
       authorName={meta.authorName}

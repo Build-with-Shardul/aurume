@@ -12,6 +12,7 @@ export type WikiNode = {
   icon: string | null;
   parentId: string | null;
   visibility: string;
+  status: string;
   archived: boolean;
   orderIndex: number;
   authorId: string | null;
@@ -30,12 +31,14 @@ export async function listWikiTree(orgId: string, userId: string): Promise<WikiN
       icon: document.icon,
       parentId: document.parentId,
       visibility: document.visibility,
+      status: document.status,
       archived: document.archived,
       orderIndex: document.orderIndex,
       authorId: document.authorId,
     })
     .from(document)
-    .where(and(eq(document.organizationId, orgId), or(eq(document.visibility, "workspace"), eq(document.authorId, userId))))
+    // Your own pages (any status) + everyone's PUBLISHED workspace pages. Others' drafts are hidden.
+    .where(and(eq(document.organizationId, orgId), or(eq(document.authorId, userId), and(eq(document.visibility, "workspace"), eq(document.status, "published")))))
     .orderBy(desc(document.updatedAt));
   return rows;
 }
@@ -53,6 +56,8 @@ export async function getReadableDocument(orgId: string, userId: string, docId: 
     .limit(1);
   const doc = rows[0];
   if (!doc) return null;
+  // Drafts are visible only to their author, regardless of visibility/mappings.
+  if (doc.status === "draft") return doc.authorId === userId ? doc : null;
   if (doc.visibility === "workspace" || doc.authorId === userId) return doc;
   const granted = await db
     .select({ id: projectDocument.id })
@@ -175,6 +180,8 @@ export type HistoryItem = { id: string; kind: "version" | "event"; type: string;
 function eventLabel(type: string, detail: string | null) {
   switch (type) {
     case "created": return "created this page";
+    case "published": return "published this page";
+    case "republished": return "published changes";
     case "renamed": return `renamed to "${detail ?? "Untitled"}"`;
     case "visibility_private": return "changed visibility to Private";
     case "visibility_workspace": return "changed visibility to Workspace";

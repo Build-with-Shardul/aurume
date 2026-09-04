@@ -292,6 +292,7 @@ function Row({
       >
         <span className="shrink-0">{icon}</span>
         <span className="truncate">{node.title || "Untitled"}</span>
+        {node.status === "draft" && <span className="ml-1 shrink-0 rounded bg-amber-100 px-1 py-0.5 text-[9px] font-medium uppercase tracking-wide text-amber-700">Draft</span>}
       </Link>
       <div className="pr-1 opacity-0 group-hover:opacity-100">
         <Menu>

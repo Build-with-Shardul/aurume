@@ -343,9 +343,13 @@ export const document = pgTable(
     parentId: text("parent_id"), // self-ref (app-enforced; nullable = top-level page)
     title: text("title").notNull().default("Untitled"),
     icon: text("icon"), // emoji
-    body: jsonb("body"), // TipTap block JSON
-    contentText: text("content_text"), // extracted plain text, for retrieval
+    body: jsonb("body"), // TipTap block JSON — the WORKING copy (what editors edit)
+    contentText: text("content_text"), // extracted plain text of the working copy, for retrieval
+    publishedBody: jsonb("published_body"), // the PUBLISHED copy (what readers see); null until first publish
+    publishedContentText: text("published_content_text"),
+    hasUnpublishedChanges: boolean("has_unpublished_changes").notNull().default(false),
     visibility: text("visibility").notNull().default("workspace"), // workspace | private
+    status: text("status").notNull().default("draft"), // draft (author-only) | published
     archived: boolean("archived").notNull().default(false),
     orderIndex: integer("order_index").notNull().default(0),
     authorId: text("author_id").references(() => user.id, { onDelete: "set null" }),

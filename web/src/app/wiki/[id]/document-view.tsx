@@ -7,15 +7,18 @@ import ConfirmDialog from "../confirm-dialog";
 import Reactions from "./reactions";
 import Comments from "./comments";
 import History from "./history";
-import { renameDocument, updateDocumentBody, setDocumentVisibility, archiveDocument, deleteDocument, recordView } from "../actions";
+import { renameDocument, updateDocumentBody, setDocumentVisibility, archiveDocument, deleteDocument, recordView, publishDocument } from "../actions";
 import type { ReactionSummary, CommentItem } from "@/lib/wiki";
 
 type Props = {
   id: string;
   title: string;
-  body: unknown;
+  readBody: unknown;
+  workingBody: unknown;
   icon: string | null;
   visibility: "workspace" | "private";
+  status: "draft" | "published";
+  hasUnpublishedChanges: boolean;
   archived: boolean;
   editable: boolean;
   authorName: string | null;
@@ -31,29 +34,62 @@ type Props = {
   currentUserId: string;
 };
 
-function initials(name: string | null) {
-  const s = (name || "").trim();
-  if (!s) return "?";
-  const parts = s.split(/\s+/);
-  return (parts.length >= 2 ? parts[0][0] + parts[1][0] : s.slice(0, 2)).toUpperCase();
-}
-
 export default function DocumentView(props: Props) {
-  const { id, title, body, visibility, archived, editable, authorName, lastEditedByName, createdLabel, updatedLabel, readMinutes, totalViews, viewsByDate, sharedWith, reactions, comments, currentUserId } = props;
+  const { id, title, readBody, workingBody, visibility, status, hasUnpublishedChanges, archived, editable, authorName, lastEditedByName, createdLabel, updatedLabel, readMinutes, totalViews, viewsByDate, sharedWith, reactions, comments, currentUserId } = props;
   const router = useRouter();
   const [t, setT] = useState(title);
   const [vis, setVis] = useState(visibility);
-  const [status, setStatus] = useState<"idle" | "saving" | "saved">("idle");
+  const [mode, setMode] = useState<"read" | "edit">(editable && status === "draft" ? "edit" : "read");
+  const [dirty, setDirty] = useState(hasUnpublishedChanges);
+  const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "offline">("idle");
   const [confirmDel, setConfirmDel] = useState(false);
   const [delBusy, setDelBusy] = useState(false);
+  const [publishing, setPublishing] = useState(false);
+  const [ready, setReady] = useState(false);
+  const [editContent, setEditContent] = useState<unknown>(workingBody);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const viewed = useRef(false);
+  const pending = useRef<{ json: unknown; text: string } | null>(null);
+  const booted = useRef(false);
+
+  const key = `aurume.wiki.pending.${id}`;
+
+  async function flush() {
+    if (!pending.current) return;
+    const { json, text } = pending.current;
+    setSaveState("saving");
+    try {
+      const r = await updateDocumentBody(id, json, text);
+      if (r && "error" in r && r.error) throw new Error(r.error);
+      pending.current = null;
+      try { localStorage.removeItem(key); } catch { /* ignore */ }
+      setSaveState("saved");
+    } catch {
+      setSaveState("offline"); // keep buffer; retry on reconnect
+    }
+  }
 
   useEffect(() => {
-    if (viewed.current) return;
-    viewed.current = true;
+    if (booted.current) return;
+    booted.current = true;
+    let buf: { json: unknown; text: string } | null = null;
+    try { const raw = localStorage.getItem(key); if (raw) buf = JSON.parse(raw); } catch { /* ignore */ }
+    if (buf?.json && editable) {
+      setEditContent(buf.json);
+      setMode("edit");
+      pending.current = buf;
+      flush();
+    }
+    setReady(true);
     recordView(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
+
+  useEffect(() => {
+    const onOnline = () => flush();
+    window.addEventListener("online", onOnline);
+    return () => window.removeEventListener("online", onOnline);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function saveTitle() {
     if (t.trim() === title.trim()) return;
@@ -62,13 +98,13 @@ export default function DocumentView(props: Props) {
   }
 
   function onBody(json: unknown, text: string) {
-    if (!editable) return;
-    setStatus("saving");
+    if (mode !== "edit") return;
+    pending.current = { json, text };
+    try { localStorage.setItem(key, JSON.stringify({ json, text })); } catch { /* ignore */ }
+    setSaveState("saving");
+    if (status === "published") setDirty(true);
     if (timer.current) clearTimeout(timer.current);
-    timer.current = setTimeout(async () => {
-      await updateDocumentBody(id, json, text);
-      setStatus("saved");
-    }, 700);
+    timer.current = setTimeout(flush, 700);
   }
 
   async function toggleVis() {
@@ -77,13 +113,7 @@ export default function DocumentView(props: Props) {
     await setDocumentVisibility(id, next);
     router.refresh();
   }
-
-  async function doArchive() {
-    await archiveDocument(id, true);
-    router.push("/wiki");
-    router.refresh();
-  }
-
+  async function doArchive() { await archiveDocument(id, true); router.push("/wiki"); router.refresh(); }
   async function confirmDelete() {
     setDelBusy(true);
     await deleteDocument(id);
@@ -92,70 +122,104 @@ export default function DocumentView(props: Props) {
     router.push("/wiki");
     router.refresh();
   }
+  async function publish() {
+    setPublishing(true);
+    if (pending.current) await flush(); // publish the latest working content
+    await publishDocument(id);
+    setPublishing(false);
+    setDirty(false);
+    router.refresh();
+  }
+  async function stopEdit() {
+    if (pending.current) await flush();
+    setMode("read");
+  }
+
+  const saveLabel = saveState === "saving" ? "Saving…" : saveState === "saved" ? "Saved" : saveState === "offline" ? "Offline — will save when you reconnect" : "";
+  const showPublish = editable && (status === "draft" || dirty);
 
   return (
     <>
-    <div className="mx-auto max-w-3xl px-8 py-10">
-      <div className="mb-6 flex h-6 items-center justify-between">
-        <span className="text-xs text-neutral-400">{status === "saving" ? "Saving…" : status === "saved" ? "Saved" : ""}</span>
-        <div className="flex items-center gap-2">
-          <History docId={id} editable={editable} />
-          {editable && (
-            <>
-              <button onClick={toggleVis} title="Toggle visibility" className="rounded-lg border border-neutral-200 px-2.5 py-1 text-xs font-medium text-neutral-600 hover:bg-neutral-50">
-                {vis === "workspace" ? "🌐 Workspace" : "🔒 Private"}
+      <div className="mx-auto max-w-3xl px-8 py-10">
+        <div className="mb-6 flex h-6 items-center justify-between">
+          <div className="flex items-center gap-2">
+            {status === "draft" ? (
+              <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-amber-700">Draft</span>
+            ) : dirty ? (
+              <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">Unpublished changes</span>
+            ) : null}
+            {mode === "edit" && <span className={`text-xs ${saveState === "offline" ? "text-amber-600" : "text-neutral-400"}`}>{saveLabel}</span>}
+          </div>
+          <div className="flex items-center gap-2">
+            {showPublish && (
+              <button onClick={publish} disabled={publishing} className="rounded-lg bg-neutral-900 px-3 py-1 text-xs font-medium text-white hover:bg-neutral-800 disabled:opacity-50">
+                {publishing ? "Publishing…" : status === "draft" ? "Publish" : "Publish changes"}
               </button>
-              <button onClick={doArchive} className="rounded-lg border border-neutral-200 px-2.5 py-1 text-xs font-medium text-neutral-600 hover:bg-neutral-50">Archive</button>
-              <button onClick={() => setConfirmDel(true)} className="rounded-lg border border-red-200 px-2.5 py-1 text-xs font-medium text-red-600 hover:bg-red-50">Delete</button>
+            )}
+            {editable && (mode === "read"
+              ? <button onClick={() => setMode("edit")} className="rounded-lg border border-neutral-200 px-2.5 py-1 text-xs font-medium text-neutral-600 hover:bg-neutral-50">Edit</button>
+              : <button onClick={stopEdit} className="rounded-lg border border-neutral-200 px-2.5 py-1 text-xs font-medium text-neutral-600 hover:bg-neutral-50">Done</button>
+            )}
+            <History docId={id} editable={editable} />
+            {editable && (
+              <>
+                <button onClick={toggleVis} title="Toggle visibility" className="rounded-lg border border-neutral-200 px-2.5 py-1 text-xs font-medium text-neutral-600 hover:bg-neutral-50">
+                  {vis === "workspace" ? "🌐 Workspace" : "🔒 Private"}
+                </button>
+                <button onClick={doArchive} className="rounded-lg border border-neutral-200 px-2.5 py-1 text-xs font-medium text-neutral-600 hover:bg-neutral-50">Archive</button>
+                <button onClick={() => setConfirmDel(true)} className="rounded-lg border border-red-200 px-2.5 py-1 text-xs font-medium text-red-600 hover:bg-red-50">Delete</button>
+              </>
+            )}
+          </div>
+        </div>
+
+        <div className="flex items-start justify-between gap-4">
+          <input
+            value={t}
+            onChange={(e) => setT(e.target.value)}
+            onBlur={saveTitle}
+            disabled={!editable}
+            placeholder="Untitled"
+            className="min-w-0 flex-1 border-0 bg-transparent text-3xl font-bold leading-tight text-neutral-900 outline-none placeholder:text-neutral-300 disabled:cursor-default"
+          />
+          <div className="shrink-0 pt-2">
+            <Reactions docId={id} reactions={reactions} />
+          </div>
+        </div>
+
+        <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-neutral-500">
+          {authorName && (
+            <span className="flex items-center gap-1.5">
+              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-neutral-200 text-[9px] font-semibold text-neutral-700">{initials(authorName)}</span>
+              {authorName}
+            </span>
+          )}
+          <span>·</span>
+          <span>{readMinutes} min read</span>
+          <span>·</span>
+          <span>Created {createdLabel}</span>
+          <span>·</span>
+          <span>Updated {updatedLabel}{lastEditedByName ? ` by ${lastEditedByName}` : ""}</span>
+          <span>·</span>
+          <ViewsStat total={totalViews} byDate={viewsByDate} />
+          {sharedWith.length > 0 && (
+            <>
+              <span>·</span>
+              <span title={sharedWith.join(", ")}>Shared with {sharedWith.length === 1 ? sharedWith[0] : `${sharedWith.length} projects`}</span>
             </>
           )}
         </div>
-      </div>
 
-      <div className="flex items-start justify-between gap-4">
-        <input
-          value={t}
-          onChange={(e) => setT(e.target.value)}
-          onBlur={saveTitle}
-          disabled={!editable}
-          placeholder="Untitled"
-          className="min-w-0 flex-1 border-0 bg-transparent text-3xl font-bold leading-tight text-neutral-900 outline-none placeholder:text-neutral-300 disabled:cursor-default"
-        />
-        <div className="shrink-0 pt-2">
-          <Reactions docId={id} reactions={reactions} />
+        {archived && <div className="mt-3 rounded-lg bg-amber-50 px-3 py-1.5 text-xs text-amber-800">This page is archived.</div>}
+
+        <div className="mt-5">
+          {ready ? (
+            <WikiEditor key={mode} docId={id} content={mode === "edit" ? editContent : readBody} editable={mode === "edit"} onChange={onBody} />
+          ) : (
+            <div className="min-h-[320px]" />
+          )}
         </div>
       </div>
-
-      {/* Metadata bar */}
-      <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-neutral-500">
-        {authorName && (
-          <span className="flex items-center gap-1.5">
-            <span className="flex h-5 w-5 items-center justify-center rounded-full bg-neutral-200 text-[9px] font-semibold text-neutral-700">{initials(authorName)}</span>
-            {authorName}
-          </span>
-        )}
-        <span>·</span>
-        <span>{readMinutes} min read</span>
-        <span>·</span>
-        <span>Created {createdLabel}</span>
-        <span>·</span>
-        <span>Updated {updatedLabel}{lastEditedByName ? ` by ${lastEditedByName}` : ""}</span>
-        <span>·</span>
-        <ViewsStat total={totalViews} byDate={viewsByDate} />
-        {sharedWith.length > 0 && (
-          <>
-            <span>·</span>
-            <span title={sharedWith.join(", ")}>Shared with {sharedWith.length === 1 ? sharedWith[0] : `${sharedWith.length} projects`}</span>
-          </>
-        )}
-      </div>
-
-      {archived && <div className="mt-3 rounded-lg bg-amber-50 px-3 py-1.5 text-xs text-amber-800">This page is archived.</div>}
-
-      <div className="mt-5">
-        <WikiEditor docId={id} content={body} editable={editable} onChange={onBody} />
-      </div>
-    </div>
 
       <Comments docId={id} comments={comments} currentUserId={currentUserId} />
 
@@ -169,6 +233,11 @@ export default function DocumentView(props: Props) {
       />
     </>
   );
+}
+
+function initials(name: string) {
+  const parts = name.trim().split(/\s+/);
+  return (parts.length >= 2 ? parts[0][0] + parts[1][0] : name.slice(0, 2)).toUpperCase();
 }
 
 function ViewsStat({ total, byDate }: { total: number; byDate: { date: string; count: number }[] }) {
