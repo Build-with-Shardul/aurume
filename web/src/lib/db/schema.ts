@@ -408,6 +408,7 @@ export const documentComment = pgTable(
     parentId: text("parent_id"),
     authorId: text("author_id").references(() => user.id, { onDelete: "set null" }),
     body: text("body").notNull(),
+    quote: text("quote"), // for inline (anchored) threads: the selected text snippet; null = page-level
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },

@@ -140,7 +140,7 @@ export async function listReactions(docId: string, userId: string): Promise<Reac
   return [...map.entries()].map(([emoji, v]) => ({ emoji, count: v.count, mine: v.mine })).sort((a, b) => b.count - a.count);
 }
 
-export type CommentItem = { id: string; parentId: string | null; authorId: string | null; authorName: string; body: string; createdLabel: string };
+export type CommentItem = { id: string; parentId: string | null; authorId: string | null; authorName: string; body: string; quote: string | null; createdLabel: string };
 
 /** All comments on a document, oldest first (client builds the tree via parentId). */
 export async function listComments(docId: string): Promise<CommentItem[]> {
@@ -150,6 +150,7 @@ export async function listComments(docId: string): Promise<CommentItem[]> {
       parentId: documentComment.parentId,
       authorId: documentComment.authorId,
       body: documentComment.body,
+      quote: documentComment.quote,
       createdAt: documentComment.createdAt,
       authorName: user.name,
       authorEmail: user.email,
@@ -164,6 +165,7 @@ export async function listComments(docId: string): Promise<CommentItem[]> {
     authorId: r.authorId,
     authorName: r.authorName || r.authorEmail || "Someone",
     body: r.body,
+    quote: r.quote,
     createdLabel: fmtWhen(r.createdAt),
   }));
 }

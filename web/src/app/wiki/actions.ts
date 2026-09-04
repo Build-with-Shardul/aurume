@@ -181,6 +181,21 @@ export async function addComment(docId: string, parentId: string | null, body: s
   return { ok: true };
 }
 
+/** Create an inline (anchored) comment thread from a text selection. Returns the
+ * root comment id so the caller can apply the anchor mark to the range. */
+export async function addInlineComment(docId: string, quote: string, body: string) {
+  const c = await ctx();
+  if (!c) return { error: "Not signed in" };
+  const text = (body || "").trim();
+  if (!text) return { error: "Empty comment" };
+  const doc = await getReadableDocument(c.orgId, c.userId, docId);
+  if (!doc) return { error: "Not found" };
+  const id = crypto.randomUUID();
+  await db.insert(documentComment).values({ id, documentId: docId, parentId: null, authorId: c.userId, body: text, quote: quote.slice(0, 300) });
+  revalidatePath(`/wiki/${docId}`);
+  return { id };
+}
+
 /** Delete a comment (author only) and any nested replies. */
 export async function deleteComment(commentId: string) {
   const c = await ctx();

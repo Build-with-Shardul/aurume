@@ -150,7 +150,7 @@ export default function DocumentView(props: Props) {
       {archived && <div className="mt-3 rounded-lg bg-amber-50 px-3 py-1.5 text-xs text-amber-800">This page is archived.</div>}
 
       <div className="mt-5">
-        <WikiEditor content={body} editable={editable} onChange={onBody} />
+        <WikiEditor docId={id} content={body} editable={editable} onChange={onBody} />
       </div>
     </div>
 

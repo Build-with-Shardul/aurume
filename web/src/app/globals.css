@@ -42,6 +42,8 @@ body {
 .wiki-prose pre code { background: none; padding: 0; }
 .wiki-prose hr { border: none; border-top: 1px solid #e5e5e5; margin: 1rem 0; }
 .wiki-prose a, .wiki-prose a.wiki-link { color: #2563eb; text-decoration: underline; cursor: pointer; }
+.wiki-prose .wiki-comment { background: rgba(250, 204, 21, 0.35); border-bottom: 2px solid #f59e0b; cursor: pointer; }
+.wiki-prose .wiki-comment:hover { background: rgba(250, 204, 21, 0.5); }
 .wiki-prose .tableWrapper { overflow-x: auto; margin: 0.6rem 0; }
 .wiki-prose table { border-collapse: collapse; width: 100%; }
 .wiki-prose th, .wiki-prose td { position: relative; border: 1px solid #e5e5e5; padding: 0.4rem 0.6rem; text-align: left; vertical-align: top; min-width: 3rem; }

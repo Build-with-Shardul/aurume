@@ -78,7 +78,10 @@ function Node({
   const [replying, setReplying] = useState(false);
   const kids = childrenOf.get(c.id) ?? [];
   return (
-    <div style={{ marginLeft: depth > 0 ? 20 : 0 }} className={depth > 0 ? "border-l border-neutral-200 pl-4" : ""}>
+    <div id={depth === 0 ? `comment-${c.id}` : undefined} style={{ marginLeft: depth > 0 ? 20 : 0 }} className={depth > 0 ? "border-l border-neutral-200 pl-4" : ""}>
+      {depth === 0 && c.quote && (
+        <p className="mb-1.5 border-l-2 border-yellow-400 bg-yellow-50 px-2 py-1 text-xs italic text-neutral-600">&ldquo;{c.quote}&rdquo;</p>
+      )}
       <div className="flex gap-2.5">
         <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-neutral-200 text-[10px] font-semibold text-neutral-700">{initials(c.authorName)}</span>
         <div className="min-w-0 flex-1">

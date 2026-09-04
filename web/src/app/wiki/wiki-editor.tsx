@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useEditor, EditorContent, type Editor } from "@tiptap/react";
+import { BubbleMenu } from "@tiptap/react/menus";
 import StarterKit from "@tiptap/starter-kit";
 import Placeholder from "@tiptap/extension-placeholder";
 import TextAlign from "@tiptap/extension-text-align";
@@ -9,17 +11,25 @@ import { TextStyle, Color } from "@tiptap/extension-text-style";
 import { Table, TableRow, TableHeader, TableCell } from "@tiptap/extension-table";
 import Image from "@tiptap/extension-image";
 import { WikiEmbed, toEmbedUrl } from "./wiki-embed";
-import { uploadWikiImage } from "./actions";
+import { CommentMark } from "./comment-mark";
+import { uploadWikiImage, addInlineComment } from "./actions";
 
 export default function WikiEditor({
+  docId,
   content,
   editable,
   onChange,
 }: {
+  docId: string;
   content: unknown;
   editable: boolean;
   onChange: (json: unknown, text: string) => void;
 }) {
+  const router = useRouter();
+  const [draft, setDraft] = useState<{ from: number; to: number; quote: string } | null>(null);
+  const [commentBody, setCommentBody] = useState("");
+  const [saving, setSaving] = useState(false);
+
   const editor = useEditor({
     extensions: [
       StarterKit.configure({ link: { openOnClick: false, HTMLAttributes: { class: "wiki-link" } } }),
@@ -33,6 +43,7 @@ export default function WikiEditor({
       TableCell,
       Image.configure({ HTMLAttributes: { class: "wiki-image" } }),
       WikiEmbed,
+      CommentMark,
     ],
     content: (content as object) ?? "",
     editable,
@@ -43,10 +54,70 @@ export default function WikiEditor({
 
   useEffect(() => () => editor?.destroy(), [editor]);
 
+  function startComment() {
+    if (!editor) return;
+    const { from, to } = editor.state.selection;
+    if (from === to) return;
+    setDraft({ from, to, quote: editor.state.doc.textBetween(from, to, " ") });
+    setCommentBody("");
+  }
+
+  async function submitComment() {
+    if (!editor || !draft || !commentBody.trim() || saving) return;
+    setSaving(true);
+    const r = await addInlineComment(docId, draft.quote, commentBody);
+    setSaving(false);
+    if (r && "id" in r && r.id) {
+      editor.chain().focus().setTextSelection({ from: draft.from, to: draft.to }).setMark("comment", { commentId: r.id }).run();
+      router.refresh();
+    }
+    setDraft(null);
+    setCommentBody("");
+  }
+
+  // Click a highlighted range → scroll its thread into view in the comments section.
+  function onEditorClick(e: React.MouseEvent) {
+    const el = (e.target as HTMLElement).closest("[data-comment-id]");
+    const cid = el?.getAttribute("data-comment-id");
+    if (cid) document.getElementById(`comment-${cid}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }
+
   return (
     <div>
       {editable && <Toolbar editor={editor} />}
-      <EditorContent editor={editor} />
+      {editable && editor && (
+        <BubbleMenu editor={editor} shouldShow={({ editor: e, from, to }) => e.isEditable && from !== to}>
+          <button onMouseDown={(ev) => ev.preventDefault()} onClick={startComment} className="rounded-lg bg-neutral-900 px-2.5 py-1 text-xs font-medium text-white shadow-lg hover:bg-neutral-800">
+            💬 Comment
+          </button>
+        </BubbleMenu>
+      )}
+      <div onClick={onEditorClick}>
+        <EditorContent editor={editor} />
+      </div>
+
+      {draft && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setDraft(null)}>
+          <div className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
+            <h2 className="text-sm font-semibold text-neutral-900">Comment on selection</h2>
+            <p className="mt-1 line-clamp-2 rounded bg-yellow-50 px-2 py-1 text-xs italic text-neutral-600">&ldquo;{draft.quote}&rdquo;</p>
+            <textarea
+              autoFocus
+              value={commentBody}
+              onChange={(e) => setCommentBody(e.target.value)}
+              rows={3}
+              placeholder="Add your comment…"
+              className="mt-3 w-full resize-none rounded-lg border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-neutral-900"
+            />
+            <div className="mt-3 flex justify-end gap-2">
+              <button onClick={() => setDraft(null)} className="rounded-lg px-3 py-1.5 text-sm font-medium text-neutral-600 hover:bg-neutral-100">Cancel</button>
+              <button onClick={submitComment} disabled={saving || !commentBody.trim()} className="rounded-lg bg-neutral-900 px-4 py-1.5 text-sm font-medium text-white hover:bg-neutral-800 disabled:opacity-40">
+                {saving ? "Adding…" : "Comment"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
