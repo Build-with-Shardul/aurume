@@ -14,6 +14,7 @@ import { WikiEmbed } from "./wiki-embed";
 import { CommentMark } from "./comment-mark";
 import { buildPageRef, type RefPage } from "./pageref";
 import { buildDiagramEmbed, type EmbedDiagram } from "./diagram-embed";
+import { buildSlash } from "./slash";
 import { addInlineComment, addComment, deleteComment } from "./actions";
 import { Btn, Sep, ColorPop, EmojiPop, LinkPop, ImageButton, EmbedPop, TableMenu, PageRefButton, DiagramButton } from "./editor-kit";
 import InlineThreadPopover, { type PopPos } from "./[id]/inline-thread-popover";
@@ -64,6 +65,7 @@ export default function WikiEditor({
       CommentMark,
       buildPageRef(pageRefs),
       buildDiagramEmbed(diagrams),
+      buildSlash(),
     ],
     content: (content as object) ?? "",
     editable,

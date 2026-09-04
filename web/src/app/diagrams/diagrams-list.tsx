@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createDiagram, deleteDiagram } from "./actions";
 import type { DiagramCard } from "@/lib/diagrams";
+import ConfirmDialog from "../wiki/confirm-dialog";
 
 // SVG previews are rendered via <img> (data URI) so any markup in the exported SVG
 // can never execute scripts in our page.
@@ -15,6 +16,8 @@ function svgSrc(p: string) {
 export default function DiagramsList({ diagrams }: { diagrams: DiagramCard[] }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
+  const [confirm, setConfirm] = useState<{ id: string; title: string } | null>(null);
+  const [delBusy, setDelBusy] = useState(false);
 
   async function create() {
     if (busy) return;
@@ -24,10 +27,12 @@ export default function DiagramsList({ diagrams }: { diagrams: DiagramCard[] }) 
     if (r && "id" in r && r.id) router.push(`/diagrams/${r.id}`);
   }
 
-  async function remove(id: string) {
-    setBusy(true);
-    await deleteDiagram(id);
-    setBusy(false);
+  async function confirmDelete() {
+    if (!confirm) return;
+    setDelBusy(true);
+    await deleteDiagram(confirm.id);
+    setDelBusy(false);
+    setConfirm(null);
     router.refresh();
   }
 
@@ -36,7 +41,7 @@ export default function DiagramsList({ diagrams }: { diagrams: DiagramCard[] }) 
       <div className="mb-6 flex items-center justify-between">
         <div>
           <h1 className="text-lg font-semibold text-neutral-900">Diagrams</h1>
-          <p className="text-sm text-neutral-400">Flowcharts, architecture, and more — powered by draw.io.</p>
+          <p className="text-sm text-neutral-400">Flowcharts, architecture, and more powered by draw.io.</p>
         </div>
         <button onClick={create} disabled={busy} className="rounded-lg bg-neutral-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-neutral-800 disabled:opacity-50">
           New diagram
@@ -71,10 +76,9 @@ export default function DiagramsList({ diagrams }: { diagrams: DiagramCard[] }) 
                 </div>
               </Link>
               <button
-                onClick={() => remove(d.id)}
-                disabled={busy}
+                onClick={() => setConfirm({ id: d.id, title: d.title })}
                 title="Delete diagram"
-                className="absolute right-2 top-2 hidden rounded-md bg-white/90 px-2 py-1 text-xs text-neutral-500 shadow-sm hover:text-red-600 group-hover:block disabled:opacity-50"
+                className="absolute right-2 top-2 hidden rounded-md bg-white/90 px-2 py-1 text-xs text-neutral-500 shadow-sm hover:text-red-600 group-hover:block"
               >
                 Delete
               </button>
@@ -82,6 +86,15 @@ export default function DiagramsList({ diagrams }: { diagrams: DiagramCard[] }) 
           ))}
         </div>
       )}
+
+      <ConfirmDialog
+        open={!!confirm}
+        title="Delete diagram?"
+        message={`"${confirm?.title || "Untitled diagram"}" will be permanently deleted. This can't be undone.`}
+        busy={delBusy}
+        onConfirm={confirmDelete}
+        onCancel={() => setConfirm(null)}
+      />
     </div>
   );
 }
