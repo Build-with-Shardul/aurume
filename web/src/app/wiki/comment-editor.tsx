@@ -6,12 +6,14 @@ import StarterKit from "@tiptap/starter-kit";
 import Placeholder from "@tiptap/extension-placeholder";
 import TextAlign from "@tiptap/extension-text-align";
 import { TextStyle, Color } from "@tiptap/extension-text-style";
+import { Table, TableRow, TableHeader, TableCell } from "@tiptap/extension-table";
 import Image from "@tiptap/extension-image";
 import { WikiEmbed } from "./wiki-embed";
-import { Btn, Sep, ColorPop, ImageButton, EmbedPop } from "./editor-kit";
+import { Btn, Sep, ColorPop, EmojiPop, LinkPop, ImageButton, EmbedPop, TableMenu } from "./editor-kit";
 
-// The extension set shared by the comment composer and the read-only renderer.
-// A subset of the page editor: rich text + color + alignment + image + video.
+// The extension set shared by the comment composer and the read-only renderer:
+// the same rich blocks as the page (headings, lists, table, color, alignment,
+// links, image, video).
 function commentExtensions(placeholder?: string) {
   return [
     StarterKit.configure({ link: { openOnClick: false, HTMLAttributes: { class: "wiki-link" } } }),
@@ -19,6 +21,10 @@ function commentExtensions(placeholder?: string) {
     TextAlign.configure({ types: ["paragraph", "heading"] }),
     TextStyle,
     Color,
+    Table.configure({ resizable: true }),
+    TableRow,
+    TableHeader,
+    TableCell,
     Image.configure({ HTMLAttributes: { class: "wiki-image" } }),
     WikiEmbed,
   ];
@@ -97,6 +103,11 @@ export function CommentComposer({
 function CommentToolbar({ editor }: { editor: Editor }) {
   return (
     <div className="flex flex-wrap items-center gap-0.5 border-b border-neutral-200 bg-neutral-50/80 px-1.5 py-1">
+      <Btn e={editor} on={() => editor.chain().focus().toggleHeading({ level: 1 }).run()} active={editor.isActive("heading", { level: 1 })} title="Heading 1">H1</Btn>
+      <Btn e={editor} on={() => editor.chain().focus().toggleHeading({ level: 2 }).run()} active={editor.isActive("heading", { level: 2 })} title="Heading 2">H2</Btn>
+      <Btn e={editor} on={() => editor.chain().focus().toggleHeading({ level: 3 }).run()} active={editor.isActive("heading", { level: 3 })} title="Heading 3">H3</Btn>
+      <Btn e={editor} on={() => editor.chain().focus().setParagraph().run()} active={editor.isActive("paragraph")} title="Paragraph">P</Btn>
+      <Sep />
       <Btn e={editor} on={() => editor.chain().focus().toggleBold().run()} active={editor.isActive("bold")} cls="font-bold" title="Bold">B</Btn>
       <Btn e={editor} on={() => editor.chain().focus().toggleItalic().run()} active={editor.isActive("italic")} cls="italic" title="Italic">I</Btn>
       <Btn e={editor} on={() => editor.chain().focus().toggleUnderline().run()} active={editor.isActive("underline")} cls="underline" title="Underline">U</Btn>
@@ -108,6 +119,12 @@ function CommentToolbar({ editor }: { editor: Editor }) {
       <Btn e={editor} on={() => editor.chain().focus().setTextAlign("center").run()} active={editor.isActive({ textAlign: "center" })} title="Align center">≡</Btn>
       <Btn e={editor} on={() => editor.chain().focus().setTextAlign("right").run()} active={editor.isActive({ textAlign: "right" })} title="Align right">⇥</Btn>
       <Sep />
+      <Btn e={editor} on={() => editor.chain().focus().toggleBulletList().run()} active={editor.isActive("bulletList")} title="Bullet list">• List</Btn>
+      <Btn e={editor} on={() => editor.chain().focus().toggleOrderedList().run()} active={editor.isActive("orderedList")} title="Numbered list">1. List</Btn>
+      <Sep />
+      <LinkPop editor={editor} />
+      <EmojiPop editor={editor} />
+      <TableMenu editor={editor} />
       <ImageButton editor={editor} />
       <EmbedPop editor={editor} />
     </div>

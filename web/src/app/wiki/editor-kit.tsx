@@ -182,6 +182,29 @@ export function ImageButton({ editor }: { editor: Editor }) {
   );
 }
 
+export function TableMenu({ editor }: { editor: Editor }) {
+  const inTable = editor.isActive("table");
+  return (
+    <Pop label="▦" title="Table">
+      {(close) => (
+        <div className="w-40">
+          {!inTable ? (
+            <MenuBtn onClick={() => { editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run(); close(); }}>Insert table</MenuBtn>
+          ) : (
+            <>
+              <MenuBtn onClick={() => editor.chain().focus().addRowAfter().run()}>Add row</MenuBtn>
+              <MenuBtn onClick={() => editor.chain().focus().addColumnAfter().run()}>Add column</MenuBtn>
+              <MenuBtn onClick={() => editor.chain().focus().deleteRow().run()}>Delete row</MenuBtn>
+              <MenuBtn onClick={() => editor.chain().focus().deleteColumn().run()}>Delete column</MenuBtn>
+              <MenuBtn danger onClick={() => { editor.chain().focus().deleteTable().run(); close(); }}>Delete table</MenuBtn>
+            </>
+          )}
+        </div>
+      )}
+    </Pop>
+  );
+}
+
 export function EmbedPop({ editor }: { editor: Editor }) {
   const [url, setUrl] = useState("");
   const [err, setErr] = useState("");

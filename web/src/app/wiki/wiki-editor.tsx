@@ -13,7 +13,7 @@ import Image from "@tiptap/extension-image";
 import { WikiEmbed } from "./wiki-embed";
 import { CommentMark } from "./comment-mark";
 import { addInlineComment } from "./actions";
-import { Btn, Sep, Pop, MenuBtn, ColorPop, EmojiPop, LinkPop, ImageButton, EmbedPop } from "./editor-kit";
+import { Btn, Sep, ColorPop, EmojiPop, LinkPop, ImageButton, EmbedPop, TableMenu } from "./editor-kit";
 
 export default function WikiEditor({
   docId,
@@ -133,7 +133,6 @@ function Toolbar({ editor }: { editor: Editor | null }) {
   }, [editor]);
 
   if (!editor) return null;
-  const inTable = editor.isActive("table");
 
   return (
     <div className="sticky top-0 z-10 mb-3 flex flex-wrap items-center gap-0.5 border-b border-neutral-200 bg-white/95 py-1.5 backdrop-blur">
@@ -162,31 +161,9 @@ function Toolbar({ editor }: { editor: Editor | null }) {
       <Btn e={editor} on={() => editor.chain().focus().toggleCodeBlock().run()} active={editor.isActive("codeBlock")} title="Code block">Code</Btn>
       <LinkPop editor={editor} />
       <EmojiPop editor={editor} />
-      <TableMenu editor={editor} inTable={inTable} />
+      <TableMenu editor={editor} />
       <ImageButton editor={editor} />
       <EmbedPop editor={editor} />
     </div>
-  );
-}
-
-function TableMenu({ editor, inTable }: { editor: Editor; inTable: boolean }) {
-  return (
-    <Pop label="▦" title="Table">
-      {(close) => (
-        <div className="w-40">
-          {!inTable ? (
-            <MenuBtn onClick={() => { editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run(); close(); }}>Insert table</MenuBtn>
-          ) : (
-            <>
-              <MenuBtn onClick={() => editor.chain().focus().addRowAfter().run()}>Add row</MenuBtn>
-              <MenuBtn onClick={() => editor.chain().focus().addColumnAfter().run()}>Add column</MenuBtn>
-              <MenuBtn onClick={() => editor.chain().focus().deleteRow().run()}>Delete row</MenuBtn>
-              <MenuBtn onClick={() => editor.chain().focus().deleteColumn().run()}>Delete column</MenuBtn>
-              <MenuBtn danger onClick={() => { editor.chain().focus().deleteTable().run(); close(); }}>Delete table</MenuBtn>
-            </>
-          )}
-        </div>
-      )}
-    </Pop>
   );
 }
