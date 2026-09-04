@@ -3,9 +3,10 @@
 import { eq, inArray } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
-import { document, documentView } from "@/lib/db/schema";
+import { document, documentView, documentAsset } from "@/lib/db/schema";
 import { getSession, getActiveMembership } from "@/lib/auth-server";
 import { getReadableDocument, canEditDocument } from "@/lib/wiki";
+import { buildKey, saveFile } from "@/lib/storage";
 
 async function ctx() {
   const session = await getSession();
@@ -79,6 +80,21 @@ export async function archiveDocument(id: string, archived: boolean) {
   await db.update(document).set({ archived, lastEditedBy: c.userId, updatedAt: new Date() }).where(eq(document.id, id));
   revalidatePath("/wiki");
   return { ok: true };
+}
+
+/** Upload an image for embedding in a page. Returns a URL served by /api/wiki/assets/[id]. */
+export async function uploadWikiImage(formData: FormData) {
+  const c = await ctx();
+  if (!c) return { error: "Not signed in" };
+  const file = formData.get("file");
+  if (!(file instanceof File)) return { error: "No file" };
+  if (!file.type.startsWith("image/")) return { error: "Only image files are allowed" };
+  if (file.size > 10 * 1024 * 1024) return { error: "Image too large (max 10MB)" };
+  const id = crypto.randomUUID();
+  const key = buildKey(c.orgId, "wiki", id, file.name || "image");
+  await saveFile(key, Buffer.from(await file.arrayBuffer()));
+  await db.insert(documentAsset).values({ id, organizationId: c.orgId, storageKey: key, mimeType: file.type, sizeBytes: file.size, createdBy: c.userId });
+  return { url: `/api/wiki/assets/${id}` };
 }
 
 /** Log a page view (best-effort; only if the user may read it). Powers view stats. */

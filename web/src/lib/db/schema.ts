@@ -357,6 +357,22 @@ export const document = pgTable(
   (t) => [index("document_org_idx").on(t.organizationId), index("document_parent_idx").on(t.parentId)],
 );
 
+// An uploaded asset (image) embedded in a Wiki page. Bytes live in the storage
+// backend at storageKey; served via /api/wiki/assets/[id] to authenticated org members.
+export const documentAsset = pgTable(
+  "document_asset",
+  {
+    id: text("id").primaryKey(),
+    organizationId: text("organization_id").notNull().references(() => organization.id, { onDelete: "cascade" }),
+    storageKey: text("storage_key").notNull(),
+    mimeType: text("mime_type"),
+    sizeBytes: integer("size_bytes"),
+    createdBy: text("created_by").references(() => user.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => [index("document_asset_org_idx").on(t.organizationId)],
+);
+
 // A page view, logged per open — powers date-wise view stats (kept simple for now).
 export const documentView = pgTable(
   "document_view",
