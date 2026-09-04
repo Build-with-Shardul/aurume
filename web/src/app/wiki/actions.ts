@@ -15,6 +15,13 @@ async function ctx() {
   return { userId: session.user.id, orgId: m.orgId };
 }
 
+/** A comment body (HTML or plain text) counts as non-empty if it has visible text,
+ * an image, or an embedded video. */
+function hasCommentContent(body: string) {
+  const stripped = body.replace(/<[^>]*>/g, "").replace(/&nbsp;/gi, " ").trim();
+  return stripped.length > 0 || /<img\b/i.test(body) || /data-wiki-embed/i.test(body);
+}
+
 async function editable(orgId: string, userId: string, id: string) {
   const doc = await getReadableDocument(orgId, userId, id);
   if (!doc || !canEditDocument(doc, userId)) return null;
@@ -214,7 +221,7 @@ export async function addComment(docId: string, parentId: string | null, body: s
   const c = await ctx();
   if (!c) return { error: "Not signed in" };
   const text = (body || "").trim();
-  if (!text) return { error: "Empty comment" };
+  if (!hasCommentContent(text)) return { error: "Empty comment" };
   const doc = await getReadableDocument(c.orgId, c.userId, docId);
   if (!doc) return { error: "Not found" };
   await db.insert(documentComment).values({ id: crypto.randomUUID(), documentId: docId, parentId: parentId ?? null, authorId: c.userId, body: text });

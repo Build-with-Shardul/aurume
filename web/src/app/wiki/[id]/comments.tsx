@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { addComment, deleteComment } from "../actions";
 import type { CommentItem } from "@/lib/wiki";
+import { CommentComposer, CommentContent } from "../comment-editor";
 
 function initials(name: string) {
   const parts = name.trim().split(/\s+/);
@@ -45,7 +46,7 @@ export default function Comments({ docId, comments, currentUserId }: { docId: st
     <div className="mx-auto mt-10 max-w-3xl border-t border-neutral-200 px-8 py-8">
       <h2 className="mb-4 text-sm font-semibold text-neutral-900">Comments <span className="font-normal text-neutral-400">({comments.length})</span></h2>
 
-      <Composer placeholder="Add a comment…" busy={busy} onSubmit={(body, done) => post(null, body, done)} />
+      <CommentComposer placeholder="Add a comment…" busy={busy} onSubmit={(body, done) => post(null, body, done)} />
 
       <div className="mt-6 space-y-5">
         {roots.length === 0 ? (
@@ -89,14 +90,14 @@ function Node({
             <span className="font-medium text-neutral-900">{c.authorName}</span>
             <span className="text-xs text-neutral-400">{c.createdLabel}</span>
           </div>
-          <p className="mt-0.5 whitespace-pre-wrap text-sm text-neutral-700">{c.body}</p>
+          <div className="mt-0.5"><CommentContent html={c.body} /></div>
           <div className="mt-1 flex items-center gap-3 text-xs text-neutral-400">
             <button onClick={() => setReplying((r) => !r)} className="hover:text-neutral-700">Reply</button>
             {c.authorId === currentUserId && <button onClick={() => onDelete(c.id)} className="hover:text-red-600">Delete</button>}
           </div>
           {replying && (
             <div className="mt-2">
-              <Composer placeholder={`Reply to ${c.authorName}…`} busy={busy} autoFocus onSubmit={(body, done) => onReply(c.id, body, () => { done(); setReplying(false); })} />
+              <CommentComposer placeholder={`Reply to ${c.authorName}…`} busy={busy} autoFocus onSubmit={(body, done) => onReply(c.id, body, () => { done(); setReplying(false); })} />
             </div>
           )}
         </div>
@@ -106,29 +107,6 @@ function Node({
           {kids.map((k) => <Node key={k.id} c={k} childrenOf={childrenOf} depth={depth + 1} currentUserId={currentUserId} busy={busy} onReply={onReply} onDelete={onDelete} />)}
         </div>
       )}
-    </div>
-  );
-}
-
-function Composer({ placeholder, busy, autoFocus, onSubmit }: { placeholder: string; busy: boolean; autoFocus?: boolean; onSubmit: (body: string, done: () => void) => void }) {
-  const [body, setBody] = useState("");
-  return (
-    <div className="flex flex-col items-end gap-2">
-      <textarea
-        autoFocus={autoFocus}
-        value={body}
-        onChange={(e) => setBody(e.target.value)}
-        placeholder={placeholder}
-        rows={2}
-        className="w-full resize-none rounded-lg border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-neutral-900"
-      />
-      <button
-        onClick={() => body.trim() && onSubmit(body, () => setBody(""))}
-        disabled={busy || !body.trim()}
-        className="rounded-lg bg-neutral-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-neutral-800 disabled:opacity-40"
-      >
-        Comment
-      </button>
     </div>
   );
 }
