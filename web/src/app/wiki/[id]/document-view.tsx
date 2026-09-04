@@ -2,11 +2,11 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import WikiEditor, { type InlineThread } from "../wiki-editor";
 import ConfirmDialog from "../confirm-dialog";
 import Reactions from "./reactions";
 import Comments from "./comments";
-import History from "./history";
 import SharePanel from "./share-panel";
 import { renameDocument, updateDocumentBody, setDocumentVisibility, archiveDocument, deleteDocument, recordView, publishDocument } from "../actions";
 import type { ReactionSummary, CommentItem, ShareUser } from "@/lib/wiki";
@@ -187,7 +187,7 @@ export default function DocumentView(props: Props) {
               ? <button onClick={() => setMode("edit")} className="rounded-lg border border-neutral-200 px-2.5 py-1 text-xs font-medium text-neutral-600 hover:bg-neutral-50">Edit</button>
               : <button onClick={stopEdit} className="rounded-lg border border-neutral-200 px-2.5 py-1 text-xs font-medium text-neutral-600 hover:bg-neutral-50">Done</button>
             )}
-            <History docId={id} editable={editable} />
+            <Link href={`/wiki/${id}/history`} className="rounded-lg border border-neutral-200 px-2.5 py-1 text-xs font-medium text-neutral-600 hover:bg-neutral-50">History</Link>
             {editable && (
               <>
                 <button onClick={toggleVis} title="Toggle visibility" className="rounded-lg border border-neutral-200 px-2.5 py-1 text-xs font-medium text-neutral-600 hover:bg-neutral-50">
