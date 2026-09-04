@@ -192,18 +192,12 @@ export default function DocumentView(props: Props) {
         </div>
 
         <div className="mt-3 flex flex-wrap items-center gap-2">
-          {sharedWith.length === 0 ? (
-            <span className="inline-flex items-center gap-1 rounded-full bg-neutral-100 px-2 py-0.5 text-xs text-neutral-400">
-              🗂 Not in any project
-            </span>
-          ) : (
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-neutral-100 px-2 py-0.5 text-xs text-neutral-600">
-              🗂 <span className="text-neutral-400">In {sharedWith.length === 1 ? "project" : `${sharedWith.length} projects`}:</span>
-              {sharedWith.map((name) => (
-                <span key={name} className="rounded bg-white px-1.5 py-0.5 font-medium text-neutral-700 ring-1 ring-neutral-200">{name}</span>
-              ))}
-            </span>
-          )}
+          <span
+            className="inline-flex cursor-default items-center gap-1 rounded-full bg-neutral-100 px-2 py-0.5 text-xs text-neutral-600"
+            title={sharedWith.length ? `In ${sharedWith.length === 1 ? "project" : "projects"}:\n${sharedWith.join("\n")}` : "Not associated with any project"}
+          >
+            🗂 {sharedWith.length} {sharedWith.length === 1 ? "project" : "projects"}
+          </span>
           <button
             onClick={() => editable && setShareOpen(true)}
             disabled={!editable}
