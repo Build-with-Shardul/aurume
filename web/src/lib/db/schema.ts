@@ -868,14 +868,39 @@ export const diagram = pgTable(
     organizationId: text("organization_id")
       .notNull()
       .references(() => organization.id, { onDelete: "cascade" }),
+    parentId: text("parent_id"), // self-ref (app-enforced; nullable = top-level)
     title: text("title").notNull().default("Untitled diagram"),
     xml: text("xml"),
     preview: text("preview"),
+    visibility: text("visibility").notNull().default("workspace"), // workspace | private
+    archived: boolean("archived").notNull().default(false),
+    orderIndex: integer("order_index").notNull().default(0),
     authorId: text("author_id").references(() => user.id, { onDelete: "set null" }),
     createdBy: text("created_by").references(() => user.id, { onDelete: "set null" }),
     lastEditedBy: text("last_edited_by").references(() => user.id, { onDelete: "set null" }),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },
-  (t) => [index("diagram_org_idx").on(t.organizationId)],
+  (t) => [index("diagram_org_idx").on(t.organizationId), index("diagram_parent_idx").on(t.parentId)],
+);
+
+// Explicit per-user shares of a diagram (grants read access even to a private one).
+export const diagramShare = pgTable(
+  "diagram_share",
+  {
+    id: text("id").primaryKey(),
+    diagramId: text("diagram_id")
+      .notNull()
+      .references(() => diagram.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    addedBy: text("added_by").references(() => user.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => [
+    uniqueIndex("diagram_share_uidx").on(t.diagramId, t.userId),
+    index("diagram_share_doc_idx").on(t.diagramId),
+    index("diagram_share_user_idx").on(t.userId),
+  ],
 );

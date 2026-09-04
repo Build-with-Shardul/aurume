@@ -33,7 +33,7 @@ export default function AppChrome({
   const bare = !authed || BARE.some((p) => pathname === p || pathname.startsWith(p + "/"));
   if (bare) return <>{children}</>;
   // Sections that render their own contextual sidebar (so we skip the generic one).
-  const selfSidebar = pathname === "/wiki" || pathname.startsWith("/wiki/");
+  const selfSidebar = pathname === "/wiki" || pathname.startsWith("/wiki/") || pathname === "/diagrams" || pathname.startsWith("/diagrams/");
 
   return (
     <div className="flex h-screen w-full flex-col overflow-hidden bg-neutral-50 text-neutral-900">

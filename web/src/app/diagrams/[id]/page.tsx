@@ -1,6 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import { getSession, getActiveMembership } from "@/lib/auth-server";
-import { getDiagram } from "@/lib/diagrams";
+import { getReadableDiagram } from "@/lib/diagrams";
 import DrawioEditor from "./drawio-editor";
 
 export default async function DiagramEditorPage({ params }: { params: Promise<{ id: string }> }) {
@@ -9,7 +9,7 @@ export default async function DiagramEditorPage({ params }: { params: Promise<{ 
   const m = await getActiveMembership();
   if (!session?.user?.id || !m?.orgId) redirect("/login");
 
-  const d = await getDiagram(m.orgId, id);
+  const d = await getReadableDiagram(m.orgId, session.user.id, id);
   if (!d) notFound();
 
   return <DrawioEditor id={d.id} title={d.title} xml={d.xml ?? ""} />;

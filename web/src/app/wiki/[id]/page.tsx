@@ -27,7 +27,7 @@ export default async function DocumentPage({ params }: { params: Promise<{ id: s
     editable ? listShareableUsers(m.orgId!, doc.id, doc.authorId) : Promise.resolve([]),
     listMentionableUsers(m.orgId!, session.user.id, doc.id),
     listReferenceablePages(m.orgId!, session.user.id, doc.id),
-    listEmbeddableDiagrams(m.orgId!),
+    listEmbeddableDiagrams(m.orgId!, session.user.id),
   ]);
   const words = ((doc.publishedContentText ?? doc.contentText) || "").trim().split(/\s+/).filter(Boolean).length;
   const readMinutes = Math.max(1, Math.round(words / 200));
