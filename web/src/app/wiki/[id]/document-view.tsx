@@ -112,14 +112,19 @@ export default function DocumentView(props: Props) {
         </div>
       </div>
 
-      <input
-        value={t}
-        onChange={(e) => setT(e.target.value)}
-        onBlur={saveTitle}
-        disabled={!editable}
-        placeholder="Untitled"
-        className="w-full border-0 bg-transparent text-3xl font-bold leading-tight text-neutral-900 outline-none placeholder:text-neutral-300 disabled:cursor-default"
-      />
+      <div className="flex items-start justify-between gap-4">
+        <input
+          value={t}
+          onChange={(e) => setT(e.target.value)}
+          onBlur={saveTitle}
+          disabled={!editable}
+          placeholder="Untitled"
+          className="min-w-0 flex-1 border-0 bg-transparent text-3xl font-bold leading-tight text-neutral-900 outline-none placeholder:text-neutral-300 disabled:cursor-default"
+        />
+        <div className="shrink-0 pt-2">
+          <Reactions docId={id} reactions={reactions} />
+        </div>
+      </div>
 
       {/* Metadata bar */}
       <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-neutral-500">
@@ -144,8 +149,6 @@ export default function DocumentView(props: Props) {
           </>
         )}
       </div>
-
-      <Reactions docId={id} reactions={reactions} />
 
       {archived && <div className="mt-3 rounded-lg bg-amber-50 px-3 py-1.5 text-xs text-amber-800">This page is archived.</div>}
 

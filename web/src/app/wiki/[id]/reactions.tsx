@@ -22,7 +22,7 @@ export default function Reactions({ docId, reactions }: { docId: string; reactio
   }
 
   return (
-    <div className="mt-3 flex flex-wrap items-center gap-1.5">
+    <div className="flex flex-wrap items-center justify-end gap-1.5">
       {reactions.map((r) => (
         <button
           key={r.emoji}
