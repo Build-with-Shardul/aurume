@@ -299,14 +299,14 @@ function ColorPop({ editor }: { editor: Editor }) {
   return (
     <Pop label={<span className="font-semibold" style={{ color: editor.getAttributes("textStyle").color || "#111" }}>A</span>} title="Text color">
       {(close) => (
-        <div className="grid grid-cols-8 gap-1">
+        <div className="flex w-[220px] flex-wrap gap-1">
           {COLORS.map((c) => (
             <button
               key={c.name}
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => { if (c.v) editor.chain().focus().setColor(c.v).run(); else editor.chain().focus().unsetColor().run(); close(); }}
               title={c.name}
-              className="flex h-6 w-6 items-center justify-center rounded border border-neutral-200 text-xs font-semibold hover:ring-2 hover:ring-neutral-300"
+              className="flex h-6 w-6 shrink-0 items-center justify-center rounded border border-neutral-200 text-xs font-semibold hover:ring-2 hover:ring-neutral-300"
               style={{ color: c.v || "#111" }}
             >
               A
